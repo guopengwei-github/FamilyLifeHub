@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: familylifehub-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////app/data/family_life_hub.db
+      - API_KEY=${API_KEY:-your-secret-api-key-change-this}
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://frontend:3000
+      - DEBUG=True
+      - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID:-}
+      - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET:-}
+      - STRAVA_REDIRECT_URI=${STRAVA_REDIRECT_URI:-http://localhost:8000/api/v1/strava/callback}
+    volumes:
+      - backend-data:/app/data
+    restart: unless-stopped
+    networks:
+      - familylifehub-network
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: familylifehub-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - familylifehub-network
+
+networks:
+  familylifehub-network:
+    driver: bridge
+
+volumes:
+  backend-data:
