@@ -78,7 +78,8 @@ async def get_dashboard_summary(
     Returns core daily metrics: sleep hours, steps, calories, work hours, and stress level.
     Requires authentication.
 
-    If user_id is provided, returns data for that user; otherwise returns current user's data.
+    Family members can view each other's data. If user_id is provided, returns data for that user.
+    Otherwise returns current user's data.
     """
     target_user_id = user_id if user_id else current_user.id
     summary = get_user_summary(db, target_user_id, target_date)
