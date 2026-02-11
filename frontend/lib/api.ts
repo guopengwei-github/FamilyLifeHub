@@ -195,6 +195,13 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 /**
+ * List all users
+ */
+export async function listUsers(): Promise<User[]> {
+  return fetchAPI<User[]>('/api/v1/users');
+}
+
+/**
  * Logout (client-side only)
  */
 export function logout(): void {
@@ -272,18 +279,25 @@ export async function deleteHealthMetric(date: string): Promise<void> {
 /**
  * Get today's overview metrics
  */
-export async function getOverview(targetDate?: string): Promise<OverviewResponse> {
-  const params = targetDate ? `?target_date=${targetDate}` : '';
-  return fetchAPI<OverviewResponse>(`/api/v1/dashboard/overview${params}`);
+export async function getOverview(targetDate?: string, userId?: number): Promise<OverviewResponse> {
+  const params = new URLSearchParams();
+  if (targetDate) params.append('target_date', targetDate);
+  if (userId) params.append('user_id', userId.toString());
+
+  const query = params.toString() ? `?${params}` : '';
+  return fetchAPI<OverviewResponse>(`/api/v1/dashboard/overview${query}`);
 }
 
 /**
  * Get trend data for specified number of days
  */
-export async function getTrends(days: number = 30, endDate?: string): Promise<TrendResponse> {
+export async function getTrends(days: number = 30, endDate?: string, userId?: number): Promise<TrendResponse> {
   const params = new URLSearchParams({ days: days.toString() });
   if (endDate) {
     params.append('end_date', endDate);
+  }
+  if (userId) {
+    params.append('user_id', userId.toString());
   }
   return fetchAPI<TrendResponse>(`/api/v1/dashboard/trends?${params}`);
 }
@@ -291,9 +305,16 @@ export async function getTrends(days: number = 30, endDate?: string): Promise<Tr
 /**
  * Get dashboard summary for current user
  */
-export async function getDashboardSummary(targetDate?: string): Promise<SummaryResponse> {
-  const params = targetDate ? `?target_date=${targetDate}` : '';
-  return fetchAPI<SummaryResponse>(`/api/v1/dashboard/summary${params}`);
+export async function getDashboardSummary(
+  targetDate?: string,
+  userId?: number
+): Promise<SummaryResponse> {
+  const params = new URLSearchParams();
+  if (targetDate) params.append('target_date', targetDate);
+  if (userId) params.append('user_id', userId.toString());
+
+  const query = params.toString() ? `?${params}` : '';
+  return fetchAPI<SummaryResponse>(`/api/v1/dashboard/summary${query}`);
 }
 
 // ============ Garmin Endpoints ============
