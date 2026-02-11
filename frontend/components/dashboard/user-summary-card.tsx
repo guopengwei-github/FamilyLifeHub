@@ -9,7 +9,6 @@ interface UserSummaryCardProps {
   summary: SummaryResponse;
   currentUser: User | null;
   viewingUser: User | null;
-  onSwitchToMe?: () => void;
 }
 
 export function UserSummaryCard({ summary, currentUser, viewingUser }: UserSummaryCardProps) {
