@@ -68,16 +68,20 @@ async def get_overview(
 @router.get("/summary", response_model=SummaryResponse)
 async def get_dashboard_summary(
     target_date: Optional[date] = Query(default=None, description="Target date (defaults to today)"),
+    user_id: Optional[int] = Query(default=None, description="Filter by user ID"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get current user's summary metrics for dashboard header.
+    Get summary metrics for dashboard header.
 
     Returns core daily metrics: sleep hours, steps, calories, work hours, and stress level.
     Requires authentication.
+
+    If user_id is provided, returns data for that user; otherwise returns current user's data.
     """
-    summary = get_user_summary(db, current_user.id, target_date)
+    target_user_id = user_id if user_id else current_user.id
+    summary = get_user_summary(db, target_user_id, target_date)
     return summary
 
 
