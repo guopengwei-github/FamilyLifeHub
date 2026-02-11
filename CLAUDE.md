@@ -244,6 +244,29 @@ When asked to "restart" the project:
 2. Then start fresh backend and frontend
 3. Use: `netstat -ano | grep -E ":3000|:3001|:8000" | awk '{print $5}' | sort -u | xargs -I {} cmd.exe /c "taskkill /F /PID {} 2>nul"`
 
+## User Viewing Pattern
+
+The dashboard supports viewing other family members' data:
+
+- **currentUser**: The logged-in user (from AuthContext)
+- **viewingUser**: The user whose data is currently displayed
+- By default, viewingUser = currentUser
+- Users can switch via dropdown in SiteHeader
+- "切换到我自己" button quickly switches back to currentUser
+
+### API Usage
+
+All dashboard endpoints accept optional `user_id` parameter:
+- GET /api/v1/dashboard/summary?user_id={id}
+- GET /api/v1/dashboard/overview?user_id={id}
+- GET /api/v1/dashboard/trends?user_id={id}
+
+### Components
+
+- **UserSelectDropdown**: Dropdown to select viewing user, shows (我) badge for current user
+- **SwitchToMeButton**: Quick button to switch back to current user's data
+- **SiteHeader**: Integrates user switcher in center section
+
 ## Future Enhancements
 
 The codebase is designed to support:
