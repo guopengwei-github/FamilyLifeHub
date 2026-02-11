@@ -39,6 +39,10 @@ export default function DashboardPage() {
   const [trends, setTrends] = useState<TrendResponse | null>(null);
   const [members, setMembers] = useState<User[]>([]);
 
+  // User states
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
+
   // UI states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,17 +91,20 @@ export default function DashboardPage() {
 
       // Get current user
       const currentUser = prefsData.user_id;
+      // Create user objects for current and viewing
+      const currentUserObj: User = {
+        id: currentUser,
+        name: summaryData.user_name,
+        email: '',
+        avatar: summaryData.avatar,
+        created_at: new Date().toISOString(),
+      };
+      setCurrentUser(currentUserObj);
+      setViewingUser(currentUserObj); // Initially viewing self
+
       // Note: We would need to fetch family members separately
       // For now, we'll just set a placeholder
-      setMembers([
-        {
-          id: currentUser,
-          name: summaryData.user_name,
-          email: '',
-          avatar: summaryData.avatar,
-          created_at: new Date().toISOString(),
-        },
-      ]);
+      setMembers([currentUserObj]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
       console.error('Error fetching dashboard data:', err);
@@ -210,7 +217,11 @@ export default function DashboardPage() {
           {!loading && !error && summary && overview && (
             <div className="space-y-8">
               {/* User Summary Card */}
-              <UserSummaryCard summary={summary} />
+              <UserSummaryCard
+                summary={summary}
+                currentUser={currentUser}
+                viewingUser={viewingUser}
+              />
 
               {/* Dashboard Cards Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

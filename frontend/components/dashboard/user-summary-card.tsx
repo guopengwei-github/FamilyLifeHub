@@ -1,16 +1,25 @@
 'use client';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { SummaryResponse } from '@/types/api';
-import { Moon, Footprints, Flame, Clock, Heart } from 'lucide-react';
+import { SummaryResponse, User } from '@/types/api';
+import { Moon, Footprints, Flame, Clock, Heart, Eye } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface UserSummaryCardProps {
   summary: SummaryResponse;
+  currentUser: User | null;
+  viewingUser: User | null;
+  onSwitchToMe?: () => void;
 }
 
-export function UserSummaryCard({ summary }: UserSummaryCardProps) {
+export function UserSummaryCard({ summary, currentUser, viewingUser }: UserSummaryCardProps) {
   const { user_name, avatar, metrics } = summary;
+
+  const isViewingSelf = viewingUser?.id === currentUser?.id;
+
+  const getInitials = (name: string) => {
+    return name.charAt(0).toUpperCase();
+  };
 
   const summaryItems = [
     {
@@ -54,11 +63,19 @@ export function UserSummaryCard({ summary }: UserSummaryCardProps) {
             <Avatar className="h-16 w-16">
               <AvatarImage src={avatar || undefined} />
               <AvatarFallback className="text-xl">
-                {user_name.charAt(0).toUpperCase()}
+                {getInitials(user_name)}
               </AvatarFallback>
             </Avatar>
             <div>
-              <h2 className="text-2xl font-bold">{user_name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold">{user_name}</h2>
+                {!isViewingSelf && (
+                  <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                    <Eye className="h-3 w-3" />
+                    正在查看
+                  </span>
+                )}
+              </div>
               <p className="text-muted-foreground">
                 {new Date(summary.date).toLocaleDateString('zh-CN', {
                   year: 'numeric',
