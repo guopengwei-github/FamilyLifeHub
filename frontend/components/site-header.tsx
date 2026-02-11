@@ -5,11 +5,12 @@ import { useAuth } from '@/contexts/auth-context';
 import { LogOut, User as UserIcon, Activity, Settings } from 'lucide-react';
 import { UserSelectDropdown } from '@/components/dashboard/user-select-dropdown';
 import { SwitchToMeButton } from '@/components/dashboard/switch-to-me-button';
+import { User } from '@/types/api';
 
 interface SiteHeaderProps {
-  users?: any[];
-  viewingUser?: any;
-  onViewingUserChange?: (user: any) => void;
+  users?: User[];
+  viewingUser?: User | null;
+  onViewingUserChange?: (user: User) => void;
   showUserSwitcher?: boolean;
 }
 
@@ -55,7 +56,7 @@ export function SiteHeader({
 
           {/* Center: User Switcher (only on dashboard) */}
           {showUserSwitcher && user && users.length > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 hidden md:flex">
               <span className="text-sm text-muted-foreground hidden sm:inline-block">查看:</span>
               <UserSelectDropdown
                 users={users}
