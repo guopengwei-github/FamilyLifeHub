@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { RefreshCw, Settings } from 'lucide-react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { SiteHeader } from '@/components/site-header';
+import { useAuth } from '@/contexts/auth-context';
 import {
   getDashboardSummary,
   getOverview,
   getTrends,
   updateHiddenCards,
   getUserPreferences,
+  listUsers,
 } from '@/lib/api';
 import {
   SummaryResponse,
@@ -33,14 +35,16 @@ import { DateNavigator } from '@/components/dashboard/date-navigator';
 import { format } from 'date-fns';
 
 export default function DashboardPage() {
+  // Auth state
+  const { user: authUser } = useAuth();
+
   // Data states
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [trends, setTrends] = useState<TrendResponse | null>(null);
-  const [members, setMembers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
 
   // User states
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
 
   // UI states
@@ -56,25 +60,47 @@ export default function DashboardPage() {
   const [hiddenCards, setHiddenCards] = useState<Set<string>>(new Set());
   const [preferences, setPreferences] = useState<UserPreference | null>(null);
 
-  // Fetch all data
-  const fetchData = async (date?: Date) => {
+  // Fetch all users
+  const fetchAllUsers = async () => {
+    try {
+      const users = await listUsers();
+      setAllUsers(users);
+      return users;
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      return [];
+    }
+  };
+
+  // Fetch user data for a specific user
+  const fetchUserData = async (user: User, date?: Date) => {
     const targetDate = date || selectedDate;
     const dateStr = format(targetDate, 'yyyy-MM-dd');
-
     setLoading(true);
     setError(null);
 
     try {
-      const [summaryData, overviewData, trendsData, prefsData] = await Promise.all([
-        getDashboardSummary(dateStr),
-        getOverview(dateStr),
-        getTrends(30, dateStr),
-        getUserPreferences(),
+      const [summaryData, overviewData, trendsData] = await Promise.all([
+        getDashboardSummary(dateStr, user.id),
+        getOverview(dateStr, user.id),
+        getTrends(30, dateStr, user.id),
       ]);
 
       setSummary(summaryData);
       setOverview(overviewData);
       setTrends(trendsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      console.error('Error fetching dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch preferences
+  const fetchPreferences = async () => {
+    try {
+      const prefsData = await getUserPreferences();
       setPreferences(prefsData);
 
       // Parse hidden cards from preferences
@@ -88,39 +114,53 @@ export default function DashboardPage() {
         }
       }
       setHiddenCards(hiddenSet);
-
-      // Get current user
-      const currentUser = prefsData.user_id;
-      // Create user objects for current and viewing
-      const currentUserObj: User = {
-        id: currentUser,
-        name: summaryData.user_name,
-        email: '',
-        avatar: summaryData.avatar,
-        created_at: new Date().toISOString(),
-      };
-      setCurrentUser(currentUserObj);
-      setViewingUser(currentUserObj); // Initially viewing self
-
-      // Note: We would need to fetch family members separately
-      // For now, we'll just set a placeholder
-      setMembers([currentUserObj]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch data');
-      console.error('Error fetching dashboard data:', err);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching preferences:', err);
     }
   };
 
+  // Handle viewing user change
+  const handleViewingUserChange = (user: User) => {
+    setViewingUser(user);
+  };
+
+  // Handle switch to me
+  const handleSwitchToMe = () => {
+    if (authUser) {
+      setViewingUser(authUser);
+    }
+  };
+
+  // Initialize: fetch preferences and all users
   useEffect(() => {
-    fetchData();
-  }, []);
+    const init = async () => {
+      if (!authUser) return;
+
+      // Fetch preferences
+      await fetchPreferences();
+
+      // Fetch all users
+      const users = await fetchAllUsers();
+
+      // Set viewing user to current user if not already set
+      if (!viewingUser) {
+        setViewingUser(authUser);
+      }
+    };
+    init();
+  }, [authUser]);
+
+  // Refetch data when viewingUser or selectedDate changes
+  useEffect(() => {
+    if (viewingUser) {
+      fetchUserData(viewingUser, selectedDate);
+    }
+  }, [viewingUser, selectedDate]);
 
   // Handle date change
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
-    fetchData(date);
+    // Data will be refetched by the useEffect when selectedDate changes
   };
 
   // Handle toggle card visibility
@@ -152,7 +192,12 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen">
-        <SiteHeader />
+        <SiteHeader
+          users={allUsers}
+          viewingUser={viewingUser}
+          onViewingUserChange={handleViewingUserChange}
+          showUserSwitcher={true}
+        />
         <main className="container mx-auto py-8 space-y-8">
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -171,7 +216,7 @@ export default function DashboardPage() {
                 显示设置
               </button>
               <button
-                onClick={() => fetchData(selectedDate)}
+                onClick={() => viewingUser && fetchUserData(viewingUser, selectedDate)}
                 className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted transition-colors"
                 disabled={loading}
               >
@@ -204,7 +249,7 @@ export default function DashboardPage() {
               <div className="text-center">
                 <p className="text-red-500 mb-4">错误: {error}</p>
                 <button
-                  onClick={() => fetchData(selectedDate)}
+                  onClick={() => viewingUser && fetchUserData(viewingUser, selectedDate)}
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
                 >
                   重试
@@ -219,7 +264,7 @@ export default function DashboardPage() {
               {/* User Summary Card */}
               <UserSummaryCard
                 summary={summary}
-                currentUser={currentUser}
+                currentUser={authUser}
                 viewingUser={viewingUser}
               />
 
@@ -272,13 +317,13 @@ export default function DashboardPage() {
               )}
 
               {/* Family Member Strip */}
-              {members.length > 1 && (
+              {allUsers.length > 1 && (
                 <FamilyMemberStrip
-                  members={members}
+                  members={allUsers}
                   metrics={overview.metrics}
-                  currentUserId={preferences?.user_id ?? 0}
+                  currentUserId={authUser?.id ?? 0}
                   onMemberClick={(userId) => {
-                    const member = members.find((m) => m.id === userId);
+                    const member = allUsers.find((m) => m.id === userId);
                     if (member) handleMemberClick(member);
                   }}
                 />
