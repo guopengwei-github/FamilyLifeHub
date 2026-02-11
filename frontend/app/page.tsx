@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, Settings } from 'lucide-react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { SiteHeader } from '@/components/site-header';
@@ -73,7 +73,7 @@ export default function DashboardPage() {
   };
 
   // Fetch user data for a specific user
-  const fetchUserData = async (user: User, date?: Date) => {
+  const fetchUserData = useCallback(async (user: User, date?: Date) => {
     const targetDate = date || selectedDate;
     const dateStr = format(targetDate, 'yyyy-MM-dd');
     setLoading(true);
@@ -95,7 +95,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
 
   // Fetch preferences
   const fetchPreferences = async () => {
@@ -122,13 +122,6 @@ export default function DashboardPage() {
   // Handle viewing user change
   const handleViewingUserChange = (user: User) => {
     setViewingUser(user);
-  };
-
-  // Handle switch to me
-  const handleSwitchToMe = () => {
-    if (authUser) {
-      setViewingUser(authUser);
-    }
   };
 
   // Initialize: fetch preferences and all users
