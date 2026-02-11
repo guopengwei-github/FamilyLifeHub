@@ -18,9 +18,9 @@ python-dateutil==2.9.0
 python-multipart==0.0.12
 
 # Garmin Connect (Community Library)
-garminconnect==0.2.38
-# garth is required by garminconnect; pinned to 0.5.21 for compatibility
-garth==0.5.21
+garminconnect>=0.2.38
+# garth - upgraded to support prompt_mfa callback for MFA handling
+garth>=0.5.0
 
 # CORS
 python-dotenv==1.0.1

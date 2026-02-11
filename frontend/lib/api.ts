@@ -109,15 +109,24 @@ async function fetchAPI<T>(
 
     if (!response.ok) {
       // Handle 401 Unauthorized - clear token and redirect to login
-      if (response.status === 401 && typeof window !== 'undefined') {
+      // BUT: Garmin/Strava 401 errors are for external service auth, not user session
+      const isExternalServiceAuth = endpoint.startsWith('/api/v1/garmin/') || endpoint.startsWith('/api/v1/strava/');
+
+      if (response.status === 401 && typeof window !== 'undefined' && !isExternalServiceAuth) {
         clearAuthToken();
         if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
           window.location.href = '/login';
         }
       }
 
+      // Parse error response
       const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `HTTP ${response.status}`);
+      // Add status code and full response to error for component-level handling
+      const errorObj = new Error(error.detail || `HTTP ${response.status}`) as any;
+      errorObj.status = response.status;
+      errorObj.detail = error.detail;  // Preserve detail field separately
+      errorObj.fullResponse = error;   // Preserve full response for debugging
+      throw errorObj;
     }
 
     return await response.json();
@@ -161,6 +170,13 @@ export async function login(data: UserLogin): Promise<Token> {
     },
     body: formData.toString(),
   });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: 'Unknown error' }));
+    const errorObj = new Error(error.detail || `HTTP ${res.status}`) as any;
+    errorObj.status = res.status;
+    throw errorObj;
+  }
 
   const response = await res.json() as Token;
 
@@ -289,11 +305,15 @@ export async function connectGarmin(
   username: string,
   password: string,
   mfaToken?: string,
-  isCn: boolean = false
+  isCn: boolean = false,
+  mfaSessionId?: string
 ): Promise<GarminConnection> {
   const body: GarminLoginRequest = { username, password, is_cn: isCn };
   if (mfaToken) {
     body.mfa_token = mfaToken;
+  }
+  if (mfaSessionId) {
+    body.mfa_session_id = mfaSessionId;
   }
   return fetchAPI<GarminConnection>('/api/v1/garmin/connect', {
     method: 'POST',
@@ -328,6 +348,19 @@ export async function syncGarmin(days: number = 7, startDate?: string): Promise<
   return fetchAPI<GarminSyncResponse>('/api/v1/garmin/sync', {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Verify Garmin MFA code (second step without credentials)
+ */
+export async function verifyGarminMfa(
+  mfaToken: string,
+  mfaSessionId: string
+): Promise<GarminConnection> {
+  return fetchAPI<GarminConnection>('/api/v1/garmin/mfa/verify', {
+    method: 'POST',
+    body: JSON.stringify({ mfa_token: mfaToken, mfa_session_id: mfaSessionId }),
   });
 }
 

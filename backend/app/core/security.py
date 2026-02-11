@@ -21,9 +21,11 @@ from app.models import User
 # Generate a Fernet key from the secret key for encrypting OAuth tokens
 # Ensure the key is 32 bytes (url-safe base64 encoded)
 def _get_fernet_key() -> bytes:
-    """Generate Fernet key from secret_key."""
-    # Use secret_key and pad/trim to 32 bytes
-    key_bytes = settings.secret_key.encode('utf-8')[:32].ljust(32, b'\0')
+    """Generate Fernet key from secret_key using SHA256 KDF."""
+    import hashlib
+    # Use SHA256 to derive a proper 32-byte key from the secret_key
+    # This provides consistent entropy regardless of secret_key length
+    key_bytes = hashlib.sha256(settings.secret_key.encode('utf-8')).digest()
     # URL-safe base64 encode to get Fernet-compatible key
     return base64.urlsafe_b64encode(key_bytes)
 
@@ -63,6 +65,59 @@ def decrypt_token(encrypted: str) -> Optional[str]:
         return decrypted.decode('utf-8')
     except Exception:
         return None
+
+
+# ============ Rate Limiting ============
+
+from collections import defaultdict
+from time import time
+
+# In-memory rate limit store: {key: [(timestamp, ...)]}
+# Stores timestamps of requests for each rate limit key
+_rate_limit_store: defaultdict[str, list[float]] = defaultdict(list)
+
+
+def _clean_old_entries(key: str, window_seconds: float) -> None:
+    """Remove entries older than the time window."""
+    now = time()
+    cutoff = now - window_seconds
+    _rate_limit_store[key] = [
+        ts for ts in _rate_limit_store[key] if ts > cutoff
+    ]
+
+
+def check_rate_limit(
+    key: str,
+    max_requests: int,
+    window_seconds: float = 60.0
+) -> tuple[bool, int]:
+    """
+    Check if a request should be rate limited.
+
+    Args:
+        key: Unique identifier for the rate limit bucket (e.g., user_id, IP)
+        max_requests: Maximum number of requests allowed in the time window
+        window_seconds: Time window in seconds (default: 60)
+
+    Returns:
+        Tuple of (allowed: bool, retry_after: int)
+        - allowed: True if request is allowed, False if rate limited
+        - retry_after: Seconds to wait before retry (if not allowed)
+    """
+    now = time()
+    _clean_old_entries(key, window_seconds)
+
+    request_count = len(_rate_limit_store[key])
+    if request_count >= max_requests:
+        # Calculate when the oldest entry will expire
+        oldest_ts = min(_rate_limit_store[key])
+        retry_after = int(oldest_ts + window_seconds - now) + 1
+        return False, retry_after
+
+    # Record this request
+    _rate_limit_store[key].append(now)
+    return True, 0
+
 
 # Define API Key header scheme (for data ingestion)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)

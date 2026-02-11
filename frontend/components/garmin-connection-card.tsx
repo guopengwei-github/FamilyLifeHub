@@ -10,9 +10,12 @@ import {
   getGarminConnection,
   unlinkGarmin,
   syncGarmin,
+  verifyGarminMfa,
 } from '@/lib/api';
 import { GarminConnection } from '@/types/api';
 import { Loader2, Unlink, RefreshCw, CheckCircle, AlertCircle, ExternalLink, Mail } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { logger } from '@/lib/utils';
 
 interface GarminConnectionCardProps {
   onSyncComplete?: () => void;
@@ -213,6 +216,7 @@ function StepMfa({
 }
 
 export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardProps) {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [connection, setConnection] = useState<GarminConnection | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -227,10 +231,18 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
   const [mfaToken, setMfaToken] = useState('');
   const [isCn, setIsCn] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [mfaSessionId, setMfaSessionId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchConnectionStatus();
-  }, []);
+    // Only fetch connection status when user is authenticated
+    // This prevents 401 errors when the component mounts before auth check completes
+    if (isAuthenticated) {
+      fetchConnectionStatus();
+    } else if (!authLoading) {
+      // If not authenticated and auth check is complete, set loading to false
+      setLoading(false);
+    }
+  }, [isAuthenticated, authLoading]);
 
   const fetchConnectionStatus = async () => {
     try {
@@ -239,7 +251,7 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
       setConnection(data);
       setError(null);
     } catch (err) {
-      console.error('Failed to fetch Garmin connection:', err);
+      logger.error('Failed to fetch Garmin connection:', err);
       setError('Failed to load Garmin connection status');
     } finally {
       setLoading(false);
@@ -256,17 +268,47 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
     try {
       setError(null);
       setConnecting(true);
+      setMfaSessionId(null);  // Clear any previous MFA session
 
       // First attempt: try without MFA
       const data = await connectGarmin(username, password, undefined, isCn);
       handleConnectionSuccess(data);
     } catch (err: any) {
-      console.error('First login attempt failed:', err);
-      const errorMsg = err?.message || 'Failed to connect Garmin account';
+      logger.error('First login attempt failed:', err);
+      logger.error('Error message:', err?.message);
+      logger.error('Error detail:', err?.detail);
+      logger.error('Error status:', err?.status);
+      logger.error('Error full object:', JSON.stringify(err));
 
-      // Check if MFA is required
-      if (err?.status === 400 || errorMsg.includes('MFA') || errorMsg.includes('2FA') || errorMsg.includes('OTP') || errorMsg.includes('authenticator')) {
+      // Check both message and detail for MFA_REQUIRED
+      const errorMsg = err?.message || 'Failed to connect Garmin account';
+      const errorDetail = err?.detail || errorMsg;
+
+      // Check if error contains MFA_REQUIRED with session_id
+      if (errorDetail.includes('MFA_REQUIRED:') || errorMsg.includes('MFA_REQUIRED:')) {
+        // Extract the session_id from the error message
+        const source = errorDetail.includes('MFA_REQUIRED:') ? errorDetail : errorMsg;
+        const sessionIdFromError = source.split('MFA_REQUIRED:')[1];
+        if (sessionIdFromError) {
+          logger.log('MFA_REQUIRED detected, session_id:', sessionIdFromError.substring(0, 16) + '...');
+          setMfaSessionId(sessionIdFromError);
+          setError(null);
+          setLoginStep('mfa');
+          return;
+        }
+      }
+
+      // Check if MFA is required (fallback detection)
+      // This includes the specific OAuth1/OAuth2 token error that occurs during MFA login
+      if (err?.status === 400 ||
+          errorMsg.includes('MFA') ||
+          errorMsg.includes('2FA') ||
+          errorMsg.includes('OTP') ||
+          errorMsg.includes('authenticator') ||
+          errorMsg.includes('OAuth1') ||
+          errorMsg.includes('verification code')) {
         // Move to step 2: MFA code input
+        logger.log('MFA detected via fallback method, status:', err?.status);
         setError(null);
         setLoginStep('mfa');
       } else if (err?.status === 401 || errorMsg.includes('401')) {
@@ -297,10 +339,20 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
     try {
       setError(null);
       setConnecting(true);
-      const data = await connectGarmin(username, password, mfaToken, isCn);
-      handleConnectionSuccess(data);
+
+      // If we have a session_id, use the new MFA-only endpoint
+      // Otherwise, fall back to the old connect endpoint with username/password
+      if (mfaSessionId) {
+        logger.log('Using MFA-only endpoint with session_id:', mfaSessionId.substring(0, 16) + '...');
+        const data = await verifyGarminMfa(mfaToken, mfaSessionId);
+        handleConnectionSuccess(data);
+      } else {
+        logger.log('No session_id, using fallback connect endpoint');
+        const data = await connectGarmin(username, password, mfaToken, isCn);
+        handleConnectionSuccess(data);
+      }
     } catch (err: any) {
-      console.error('MFA login failed:', err);
+      logger.error('MFA login failed:', err);
       const errorMsg = err?.message || 'Failed to connect Garmin account';
 
       if (err?.status === 401 || errorMsg.includes('401') || errorMsg.includes('Invalid') || errorMsg.includes('expired')) {
@@ -309,6 +361,8 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
             ? '验证码无效或已过期。请重新获取验证码并重试。'
             : 'Invalid or expired verification code. Please request a new code and try again.'
         );
+        // Clear MFA session on error so user can start over
+        setMfaSessionId(null);
       } else {
         setError(`Failed to connect: ${errorMsg}`);
       }
@@ -321,6 +375,7 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
     setConnection(data);
     setShowLoginForm(false);
     setLoginStep('credentials');
+    setMfaSessionId(null);  // Clear MFA session after successful connection
     setSyncResult(
       isCn
         ? 'Garmin账号已连接！OAuth令牌已保存，以后将自动同步。'
@@ -360,7 +415,7 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
           : 'Garmin account unlinked successfully'
       );
     } catch (err) {
-      console.error('Failed to unlink Garmin account:', err);
+      logger.error('Failed to unlink Garmin account:', err);
       setError('Failed to unlink Garmin account');
     }
   };
@@ -391,7 +446,7 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
         );
       }
     } catch (err: any) {
-      console.error('Failed to sync Garmin data:', err);
+      logger.error('Failed to sync Garmin data:', err);
       const errorMsg = err?.message || 'Failed to sync Garmin data';
 
       // Check for authentication errors that might require reconnection
@@ -416,11 +471,13 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
     setUsername('');
     setPassword('');
     setMfaToken('');
+    setMfaSessionId(null);  // Clear MFA session
   };
 
   const handleBackToCredentials = () => {
     setLoginStep('credentials');
     setError(null);
+    setMfaSessionId(null);  // Clear MFA session when going back
   };
 
   if (loading && !connection) {

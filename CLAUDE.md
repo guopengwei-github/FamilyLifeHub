@@ -208,6 +208,42 @@ rm backend/family_life_hub.db
 docker-compose up -d
 ```
 
+## Lessons Learned
+
+### API Error Handling Pattern
+**CRITICAL**: When writing frontend API functions that use `fetch()` directly (not the `fetchAPI` wrapper), you MUST:
+
+1. Check `res.ok` or `res.status` before parsing JSON
+2. Throw a proper error with status code for the caller to handle
+
+**Bad pattern** (causes silent failures and page refresh loops):
+```typescript
+const res = await fetch(url, options);
+const response = await res.json() as SomeType;  // Fails on 401/400!
+return response;
+```
+
+**Correct pattern**:
+```typescript
+const res = await fetch(url, options);
+if (!res.ok) {
+  const error = await res.json().catch(() => ({ detail: 'Unknown error' }));
+  const errorObj = new Error(error.detail || `HTTP ${res.status}`) as any;
+  errorObj.status = res.status;
+  throw errorObj;
+}
+const response = await res.json() as SomeType;
+return response;
+```
+
+**Why this matters**: When login fails with 401, the error response is `{"detail": "Incorrect email or password"}`, not a Token. Without checking `res.ok`, the code tries to access `response.access_token` (undefined), stores garbage, then redirects to首页 where the invalid token causes another redirect back to login.
+
+### Restarting Services
+When asked to "restart" the project:
+1. ALWAYS kill existing processes on ports 3000, 3001, 8000 first
+2. Then start fresh backend and frontend
+3. Use: `netstat -ano | grep -E ":3000|:3001|:8000" | awk '{print $5}' | sort -u | xargs -I {} cmd.exe /c "taskkill /F /PID {} 2>nul"`
+
 ## Future Enhancements
 
 The codebase is designed to support:

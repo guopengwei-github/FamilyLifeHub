@@ -206,6 +206,13 @@ class GarminLoginRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=255, description="Garmin Connect password")
     mfa_token: Optional[str] = Field(None, max_length=10, description="Optional MFA token for 2FA")
     is_cn: bool = Field(False, description="True for China (garmin.cn), False for International (garmin.com)")
+    mfa_session_id: Optional[str] = Field(None, description="MFA session ID for resuming login (server-side storage)")
+
+
+class GarminMfaVerifyRequest(BaseModel):
+    """Schema for Garmin MFA verification only (second step without credentials)."""
+    mfa_token: str = Field(..., min_length=1, max_length=10, description="MFA verification code")
+    mfa_session_id: str = Field(..., description="MFA session ID from initial login")
 
 
 class GarminConnectionResponse(BaseModel):

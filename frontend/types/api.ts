@@ -166,7 +166,8 @@ export interface GarminLoginRequest {
   username: string;
   password: string;
   mfa_token?: string;
-  is_cn?: boolean;  // True for China, False for International
+  is_cn: boolean;  // True for China, False for International (always sent by frontend)
+  mfa_session_id?: string;  // MFA session ID for resuming login (server-side storage)
 }
 
 export interface GarminSyncRequest {
@@ -181,6 +182,11 @@ export interface GarminSyncResponse {
   metrics_updated: number;
   errors: string[];
   last_sync_at: string | null;
+}
+
+export interface GarminMfaVerifyRequest {
+  mfa_token: string;
+  mfa_session_id: string;
 }
 
 // ============ Strava Types ============

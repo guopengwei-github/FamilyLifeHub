@@ -49,8 +49,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(response.user);
       router.push('/');
     } catch (error) {
-      setIsLoading(false);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -61,8 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(response.user);
       router.push('/');
     } catch (error) {
-      setIsLoading(false);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
