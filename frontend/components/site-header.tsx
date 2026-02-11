@@ -3,14 +3,28 @@
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { LogOut, User as UserIcon, Activity, Settings } from 'lucide-react';
+import { UserSelectDropdown } from '@/components/dashboard/user-select-dropdown';
+import { SwitchToMeButton } from '@/components/dashboard/switch-to-me-button';
 
-export function SiteHeader() {
+interface SiteHeaderProps {
+  users?: any[];
+  viewingUser?: any;
+  onViewingUserChange?: (user: any) => void;
+  showUserSwitcher?: boolean;
+}
+
+export function SiteHeader({
+  users = [],
+  viewingUser = null,
+  onViewingUserChange,
+  showUserSwitcher = false,
+}: SiteHeaderProps) {
   const { user, logout } = useAuth();
 
   return (
     <header className="border-b">
       <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           {/* Logo and navigation */}
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2">
@@ -38,6 +52,24 @@ export function SiteHeader() {
               </Link>
             </nav>
           </div>
+
+          {/* Center: User Switcher (only on dashboard) */}
+          {showUserSwitcher && user && users.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground hidden sm:inline-block">查看:</span>
+              <UserSelectDropdown
+                users={users}
+                viewingUser={viewingUser}
+                currentUser={user}
+                onChange={onViewingUserChange || (() => {})}
+              />
+              <SwitchToMeButton
+                viewingUser={viewingUser}
+                currentUser={user}
+                onClick={() => onViewingUserChange?.(user)}
+              />
+            </div>
+          )}
 
           {/* User menu */}
           {user && (
