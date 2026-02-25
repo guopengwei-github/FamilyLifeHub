@@ -69,7 +69,7 @@ export function getStoredUser(): User | null {
 /**
  * Set user in localStorage
  */
-function setStoredUser(user: User): void {
+export function setStoredUser(user: User): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
@@ -217,6 +217,42 @@ export async function changePassword(currentPassword: string, newPassword: strin
       new_password: newPassword,
     }),
   });
+}
+
+/**
+ * Update user profile (name and/or avatar URL)
+ */
+export async function updateProfile(data: { name?: string; avatar?: string }): Promise<User> {
+  const user = await fetchAPI<User>('/api/v1/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  setStoredUser(user);
+  return user;
+}
+
+/**
+ * Upload avatar image file
+ */
+export async function uploadAvatar(file: File): Promise<User> {
+  const token = getAuthToken();
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${API_URL}/api/v1/auth/avatar`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: 'Upload failed' }));
+    throw new Error(error.detail || `HTTP ${res.status}`);
+  }
+
+  const user = await res.json() as User;
+  setStoredUser(user);
+  return user;
 }
 
 // ============ Health Metric Endpoints ============

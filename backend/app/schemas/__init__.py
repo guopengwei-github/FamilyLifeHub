@@ -62,6 +62,12 @@ class PasswordChange(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=100, description="New password")
 
 
+class ProfileUpdate(BaseModel):
+    """Schema for updating user profile."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="User's name")
+    avatar: Optional[str] = Field(None, max_length=255, description="Avatar URL or path")
+
+
 # ============ Health Metric Schemas ============
 
 class HealthMetricBase(BaseModel):
