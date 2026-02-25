@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SleepCard } from './sleep-card';
 import { StressCard } from './stress-card';
-import { ActivityHealthCard } from './activity-health-card';
+import { ActivityCard } from './activity-card';
+import { BodyStatusCard } from './body-status-card';
+import { format } from 'date-fns';
 
 interface MemberDetailPanelProps {
   user: User | null;
@@ -124,8 +126,17 @@ export function MemberDetailPanel({
               onToggleCard={handleToggleCard}
             />
 
-            {/* Activity/Health Card */}
-            <ActivityHealthCard
+            {/* Activity Card */}
+            <ActivityCard
+              metrics={userMetrics}
+              userId={user.id}
+              date={format(new Date(), 'yyyy-MM-dd')}
+              hiddenCards={hiddenCards}
+              onToggleCard={handleToggleCard}
+            />
+
+            {/* Body Status Card */}
+            <BodyStatusCard
               metrics={userMetrics}
               hiddenCards={hiddenCards}
               onToggleCard={handleToggleCard}

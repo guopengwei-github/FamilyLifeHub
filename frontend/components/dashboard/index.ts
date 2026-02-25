@@ -7,4 +7,5 @@ export { SleepCard } from './sleep-card';
 export { StressCard } from './stress-card';
 export { FamilyMemberStrip } from './family-member-strip';
 export { MemberDetailPanel } from './member-detail-panel';
-export { ActivityHealthCard } from './activity-health-card';
+export { ActivityCard } from './activity-card';
+export { BodyStatusCard } from './body-status-card';
