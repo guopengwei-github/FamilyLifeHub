@@ -1,3 +1,5 @@
+// ABOUTME: User profile settings page for editing name and uploading avatar.
+// ABOUTME: Supports JPG/PNG/WebP images up to 2MB.
 'use client';
 
 import { useState, useRef } from 'react';
