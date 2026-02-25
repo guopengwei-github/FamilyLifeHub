@@ -24,7 +24,8 @@ import {
 } from '@/types/api';
 import { UserSummaryCard } from '@/components/dashboard/user-summary-card';
 import { SleepCard } from '@/components/dashboard/sleep-card';
-import { ActivityHealthCard } from '@/components/dashboard/activity-health-card';
+import { ActivityCard } from '@/components/dashboard/activity-card';
+import { BodyStatusCard } from '@/components/dashboard/body-status-card';
 import { StressCard } from '@/components/dashboard/stress-card';
 import { TrendsCard } from '@/components/dashboard/trends-card';
 import { FamilyMemberStrip } from '@/components/dashboard/family-member-strip';
@@ -271,9 +272,20 @@ export default function DashboardPage() {
                   />
                 )}
 
-                {/* Activity/Health Card */}
-                {!hiddenCards.has(CARD_IDS.ACTIVITY_HEALTH) && (
-                  <ActivityHealthCard
+                {/* Activity Card */}
+                {!hiddenCards.has(CARD_IDS.ACTIVITY) && (
+                  <ActivityCard
+                    metrics={overview.metrics}
+                    userId={viewingUser?.id}
+                    date={format(selectedDate, 'yyyy-MM-dd')}
+                    hiddenCards={hiddenCards}
+                    onToggleCard={(cardId, hidden) => handleToggleCard(cardId as CardId, hidden)}
+                  />
+                )}
+
+                {/* Body Status Card */}
+                {!hiddenCards.has(CARD_IDS.BODY_STATUS) && (
+                  <BodyStatusCard
                     metrics={overview.metrics}
                     hiddenCards={hiddenCards}
                     onToggleCard={(cardId, hidden) => handleToggleCard(cardId as CardId, hidden)}

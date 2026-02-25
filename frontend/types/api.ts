@@ -245,7 +245,8 @@ export interface SummaryResponse {
 
 export const CARD_IDS = {
   SLEEP: 'sleep',
-  ACTIVITY_HEALTH: 'activity_health',
+  ACTIVITY: 'activity',
+  BODY_STATUS: 'body_status',
   STRESS: 'stress',
   TRENDS: 'trends'
 } as const;
