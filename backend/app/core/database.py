@@ -8,7 +8,7 @@ from app.core.config import settings
 
 # Create SQLAlchemy engine
 engine = create_engine(
-    settings.database_url,
+    settings.database_path,
     connect_args={"check_same_thread": False}  # Needed for SQLite
 )
 
