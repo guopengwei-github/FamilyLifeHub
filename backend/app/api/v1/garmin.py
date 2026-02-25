@@ -6,17 +6,20 @@ from typing import Optional
 import secrets
 import base64
 import json
+from datetime import datetime
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user, check_rate_limit
-from app.models import User, GarminConnection
+from app.models import User, GarminConnection, GarminActivity
 from app.services import garmin as garmin_service
 from app.schemas import (
     GarminLoginRequest,
     GarminMfaVerifyRequest,
     GarminConnectionResponse,
     GarminSyncRequest,
-    GarminSyncResponse
+    GarminSyncResponse,
+    GarminActivitiesResponse,
+    GarminActivityResponse
 )
 
 router = APIRouter(prefix="/garmin", tags=["Garmin"])
@@ -337,6 +340,7 @@ async def sync_garmin(
             days_synced=results['days_synced'],
             metrics_created=results['metrics_created'],
             metrics_updated=results['metrics_updated'],
+            activities_created=results.get('activities_created', 0),
             errors=results['errors'],
             last_sync_at=results.get('last_sync_at')
         )
@@ -356,3 +360,49 @@ async def sync_garmin(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error syncing Garmin data: {str(e)}"
         )
+
+
+@router.get("/activities", response_model=GarminActivitiesResponse)
+async def get_garmin_activities(
+    user_id: int,
+    date: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get detailed Garmin activities for a specific date.
+
+    Requires authentication. Users can only view their own activities.
+
+    Args:
+        user_id: User ID to fetch activities for
+        date: Date in YYYY-MM-DD format
+
+    Returns:
+        List of Garmin activities for the specified date
+    """
+
+    # Users can only view their own activities
+    if current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own activities"
+        )
+
+    try:
+        activity_date = datetime.strptime(date, '%Y-%m-%d').date()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid date format. Use YYYY-MM-DD"
+        )
+
+    activities = db.query(GarminActivity).filter(
+        GarminActivity.user_id == user_id,
+        GarminActivity.date == activity_date
+    ).order_by(GarminActivity.start_time).all()
+
+    return GarminActivitiesResponse(
+        activities=activities,
+        count=len(activities)
+    )

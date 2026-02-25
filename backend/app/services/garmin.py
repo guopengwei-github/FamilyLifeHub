@@ -4,15 +4,17 @@ import garth
 from garth.http import Client
 from garth.sso import login as garth_login, resume_login
 from garth.exc import GarthHTTPError, GarthException
+from garth.stats import DailySteps, DailyIntensityMinutes
 from datetime import datetime, timedelta, date
 from typing import Dict, List, Optional, Any, Tuple
 import logging
 import secrets
 import base64
 import pickle
+import traceback
 
 from app.core.security import encrypt_token, decrypt_token
-from app.models import User, GarminConnection, HealthMetric
+from app.models import User, GarminConnection, HealthMetric, GarminActivity
 from app.core.database import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -297,7 +299,6 @@ def login(
             logger.error(f"{region} login failed: {e}")
             logger.error(f"Error type: {type(e).__name__}")
             logger.error(f"Error message details: {error_msg}")
-            import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
 
             # Check if this is our MFA_REQUIRED error with session_id - MUST BE FIRST!
@@ -410,6 +411,137 @@ def fetch_daily_summary(client: Client, target_date: date) -> Optional[Dict[str,
         return None
 
 
+def fetch_daily_wellness(client: Client, target_date: date) -> Optional[Dict[str, Any]]:
+    """
+    Fetch daily wellness summary (steps, distance, calories) from Garmin.
+
+    Uses garth Stats API for steps/distance which works for both CN and International.
+    Attempts to fetch calories from wellness summary endpoint (may not work for CN users).
+
+    Args:
+        client: Authenticated garth Client
+        target_date: Date to fetch wellness data for
+
+    Returns:
+        Daily wellness data dictionary or None
+    """
+    result = {}
+
+    # Fetch steps and distance from Stats API
+    try:
+        steps_data = DailySteps.list(end=target_date, period=1, client=client)
+        logger.debug(f"DailySteps.list() returned {len(steps_data)} items for {target_date}")
+        if steps_data:
+            data = steps_data[0]
+            result['totalSteps'] = data.total_steps
+            result['totalDistanceMeters'] = data.total_distance
+            logger.debug(f"Steps data for {target_date}: steps={data.total_steps}, distance={data.total_distance}m")
+    except Exception as e:
+        logger.warning(f"Error fetching daily steps for {target_date}: {e}")
+        logger.debug(traceback.format_exc())
+
+    # Try to fetch calories from wellness summary endpoint
+    # Note: This may not work for CN users (returns 405)
+    try:
+        date_str = target_date.strftime('%Y-%m-%d')
+        profile = client.connectapi("/userprofile-service/socialProfile")
+        if profile and profile.get('id'):
+            user_id = profile['id']
+            wellness_summary = client.connectapi(
+                f"/wellness-service/wellness/dailySummary/{user_id}?date={date_str}"
+            )
+            if wellness_summary:
+                # Extract calories from various possible fields
+                if 'totalKilocalories' in wellness_summary:
+                    result['totalKilocalories'] = wellness_summary['totalKilocalories']
+                    logger.debug(f"Calories from totalKilocalories: {wellness_summary['totalKilocalories']}")
+                elif 'kilocalories' in wellness_summary:
+                    result['totalKilocalories'] = wellness_summary['kilocalories']
+                    logger.debug(f"Calories from kilocalories: {wellness_summary['kilocalories']}")
+                elif 'activeKilocalories' in wellness_summary:
+                    result['totalKilocalories'] = wellness_summary['activeKilocalories']
+                    logger.debug(f"Calories from activeKilocalories: {wellness_summary['activeKilocalories']}")
+    except Exception as e:
+        logger.debug(f"Could not fetch calories from wellness summary (expected for CN users): {e}")
+
+    return result if result else None
+
+
+def fetch_daily_intensity(client: Client, target_date: date) -> Optional[Dict[str, Any]]:
+    """
+    Fetch daily intensity minutes (exercise duration) from Garmin using garth Stats API.
+
+    Note: This uses the DailyIntensityMinutes stats which works for both CN and International.
+
+    Args:
+        client: Authenticated garth Client
+        target_date: Date to fetch intensity data for
+
+    Returns:
+        Dictionary with moderate and vigorous intensity minutes
+    """
+    try:
+        intensity_data = DailyIntensityMinutes.list(end=target_date, period=1, client=client)
+        logger.debug(f"DailyIntensityMinutes.list() returned {len(intensity_data)} items for {target_date}")
+        if intensity_data:
+            data = intensity_data[0]
+            total_minutes = (data.moderate_value or 0) + (data.vigorous_value or 0)
+            logger.debug(f"Intensity data for {target_date}: moderate={data.moderate_value}, vigorous={data.vigorous_value}, total={total_minutes}")
+            return {
+                'moderate_minutes': data.moderate_value,
+                'vigorous_minutes': data.vigorous_value,
+                'total_minutes': total_minutes,
+            }
+        logger.warning(f"DailyIntensityMinutes.list() returned empty or None data for {target_date}")
+        return None
+    except Exception as e:
+        logger.warning(f"Error fetching daily intensity for {target_date}: {e}")
+        logger.debug(traceback.format_exc())
+        return None
+
+
+def fetch_daily_activities(client: Client, target_date: date) -> List[Dict[str, Any]]:
+    """
+    Fetch activities for a specific date from Garmin.
+
+    Args:
+        client: Authenticated garth Client
+        target_date: Date to fetch activities for
+
+    Returns:
+        List of activity dictionaries or empty list
+    """
+    try:
+        date_str = target_date.strftime('%Y-%m-%d')
+        activities = client.connectapi(
+            f"/activity-service/activity/list?startDate={date_str}&endDate={date_str}"
+        )
+        logger.debug(f"Activities for {date_str}: count={len(activities) if activities else 0}")
+        return activities if activities else []
+    except Exception as e:
+        logger.warning(f"Error fetching activities for {target_date}: {e}")
+        logger.debug(traceback.format_exc())
+        return []
+
+
+def parse_garmin_time(time_str: Optional[str]) -> Optional[datetime]:
+    """
+    Parse Garmin timestamp string to datetime object.
+
+    Args:
+        time_str: ISO format timestamp string from Garmin
+
+    Returns:
+        datetime object or None
+    """
+    if not time_str:
+        return None
+    try:
+        return datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+    except (ValueError, AttributeError):
+        return None
+
+
 def _safe_int(value: Any) -> Optional[int]:
     """Safely convert value to int, returning None if conversion fails."""
     if value is None:
@@ -434,6 +566,8 @@ def map_garmin_to_health_metric(
     user_id: int,
     garmin_data: Dict[str, Any],
     metric_date: date,
+    wellness_data: Optional[Dict[str, Any]] = None,
+    intensity_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Map Garmin API data to HealthMetric fields.
@@ -442,6 +576,8 @@ def map_garmin_to_health_metric(
         user_id: User ID
         garmin_data: Garmin daily summary data from dailySleepData endpoint
         metric_date: Date for the metric
+        wellness_data: Optional daily wellness data (steps, distance)
+        intensity_data: Optional intensity data (exercise minutes)
 
     Returns:
         Dictionary with HealthMetric fields
@@ -463,7 +599,7 @@ def map_garmin_to_health_metric(
         'spo2': None,
         'respiration_rate': None,
         'resting_hr': None,
-        'sleep_score': None
+        'sleep_score': None,
     }
 
     # Extract data from dailySleepDTO structure
@@ -504,19 +640,108 @@ def map_garmin_to_health_metric(
         if bb_values:
             metric['body_battery'] = _safe_int(bb_values[-1])
 
-    # Extract SpO2
-    if 'wellnessSpO2SleepSummaryDTO' in garmin_data and garmin_data['wellnessSpO2SleepSummaryDTO']:
-        spo2_data = garmin_data['wellnessSpO2SleepSummaryDTO']
-        if 'avgSpO2' in spo2_data:
-            metric['spo2'] = _safe_float(spo2_data['avgSpO2'])
+    # Extract SpO2 (case-insensitive key lookup)
+    spo2_key = next((k for k in garmin_data.keys() if 'spo2sleepsummarydto' in k.lower()), None)
+    if spo2_key:
+        spo2_data = garmin_data[spo2_key]
+        # Case-insensitive check for avgSpO2 key
+        avg_spo2_key = next((k for k in spo2_data.keys() if k.lower() == 'avgspo2'), None)
+        if avg_spo2_key:
+            metric['spo2'] = _safe_float(spo2_data[avg_spo2_key])
+            logger.debug(f"    Mapping SpO2: {spo2_data[avg_spo2_key]}% -> {metric['spo2']}")
 
-    # Extract respiration
-    if 'wellnessEpochRespirationAveragesList' in garmin_data and garmin_data['wellnessEpochRespirationAveragesList']:
-        resp_values = [r.get('breathsPerMinute') for r in garmin_data['wellnessEpochRespirationAveragesList'] if r.get('breathsPerMinute') is not None]
+    # Extract respiration (case-insensitive key lookup)
+    respiration_key = next((k for k in garmin_data.keys() if 'respirationaverageslist' in k.lower()), None)
+    if respiration_key:
+        resp_list = garmin_data[respiration_key]
+        # Case-insensitive check for breathsPerMinute key
+        resp_values = []
+        for r in resp_list:
+            bpm_key = next((k for k in r.keys() if k.lower() == 'breathsperminute'), None)
+            if bpm_key and r[bpm_key] is not None:
+                resp_values.append(r[bpm_key])
         if resp_values:
             metric['respiration_rate'] = _safe_float(sum(resp_values) / len(resp_values))
+            logger.debug(f"    Mapping respiration_rate: {metric['respiration_rate']} bpm (from {len(resp_values)} readings)")
+
+    # Extract activity data from wellness summary (steps, distance, calories)
+    if wellness_data:
+        if 'totalSteps' in wellness_data:
+            metric['steps'] = _safe_int(wellness_data['totalSteps'])
+            logger.debug(f"    Mapping steps: {wellness_data['totalSteps']} -> {metric['steps']}")
+        if 'totalDistanceMeters' in wellness_data:
+            metric['distance_km'] = _safe_float(wellness_data['totalDistanceMeters'] / 1000)
+            logger.debug(f"    Mapping distance: {wellness_data['totalDistanceMeters']}m -> {metric['distance_km']}km")
+        if 'totalKilocalories' in wellness_data:
+            metric['calories'] = _safe_int(wellness_data['totalKilocalories'])
+            logger.debug(f"    Mapping calories: {wellness_data['totalKilocalories']} -> {metric['calories']}")
+
+    # Extract exercise minutes from intensity data
+    if intensity_data and 'total_minutes' in intensity_data:
+        metric['exercise_minutes'] = _safe_int(intensity_data['total_minutes'])
+        logger.debug(f"    Mapping exercise_minutes: {intensity_data['total_minutes']} -> {metric['exercise_minutes']}")
 
     return metric
+
+
+def save_garmin_activities(
+    user_id: int,
+    activities: List[Dict[str, Any]],
+    activity_date: date,
+    db_session
+) -> int:
+    """
+    Save detailed Garmin activities to database.
+
+    Args:
+        user_id: User ID
+        activities: List of activity data from Garmin
+        activity_date: Date of the activities
+        db_session: Database session
+
+    Returns:
+        Number of activities saved
+    """
+    count = 0
+    for activity in activities:
+        garmin_activity_id = activity.get('activityId')
+
+        # Skip if no activity ID
+        if not garmin_activity_id:
+            continue
+
+        # Check if activity already exists
+        existing = db_session.query(GarminActivity).filter(
+            GarminActivity.user_id == user_id,
+            GarminActivity.garmin_activity_id == garmin_activity_id
+        ).first()
+
+        if existing:
+            continue
+
+        activity_type_info = activity.get('activityType', {})
+        new_activity = GarminActivity(
+            user_id=user_id,
+            date=activity_date,
+            garmin_activity_id=garmin_activity_id,
+            activity_type=activity_type_info.get('typeKey'),
+            activity_type_key=activity_type_info.get('typeKey'),
+            name=activity.get('activityName'),
+            duration_seconds=activity.get('duration'),
+            distance_meters=activity.get('distance'),
+            calories=activity.get('calories'),
+            average_heartrate=activity.get('averageHR'),
+            max_heartrate=activity.get('maxHR'),
+            avg_speed_mps=activity.get('averageSpeed'),
+            max_speed_mps=activity.get('maxSpeed'),
+            elevation_gain_meters=activity.get('elevationGain'),
+            start_time=parse_garmin_time(activity.get('startTimeGMT')),
+            start_time_local=parse_garmin_time(activity.get('startTimeLocal')),
+        )
+        db_session.add(new_activity)
+        count += 1
+
+    return count
 
 
 def refresh_garmin_data(
@@ -625,6 +850,7 @@ def refresh_garmin_data(
             'days_synced': 0,
             'metrics_created': 0,
             'metrics_updated': 0,
+            'activities_created': 0,
             'errors': []
         }
 
@@ -634,13 +860,17 @@ def refresh_garmin_data(
                 logger.info(f"Fetching data for {current_date}")
 
                 daily_summary = fetch_daily_summary(client, current_date)
+                daily_wellness = fetch_daily_wellness(client, current_date)
+                daily_intensity = fetch_daily_intensity(client, current_date)
 
                 if not daily_summary:
                     logger.warning(f"No daily_summary data for {current_date}, skipping")
                     current_date += timedelta(days=1)
                     continue
 
-                metric_data = map_garmin_to_health_metric(user_id, daily_summary, current_date)
+                metric_data = map_garmin_to_health_metric(
+                    user_id, daily_summary, current_date, daily_wellness, daily_intensity
+                )
 
                 # Check if we have any data worth saving
                 has_data = any(
@@ -650,18 +880,21 @@ def refresh_garmin_data(
                 )
 
                 if has_data:
+                    logger.info(f"Saving metric_data: {metric_data}")
                     existing_metric = db.query(HealthMetric).filter(
                         HealthMetric.user_id == user_id,
                         HealthMetric.date == current_date
                     ).first()
 
                     if existing_metric:
+                        logger.info(f"Updating existing metric for {current_date}")
                         for field, value in metric_data.items():
                             if field not in ['user_id', 'date'] and value is not None:
                                 setattr(existing_metric, field, value)
                         existing_metric.updated_at = datetime.utcnow()
                         sync_results['metrics_updated'] += 1
                     else:
+                        logger.info(f"Creating new metric for {current_date}")
                         new_metric = HealthMetric(**metric_data)
                         db.add(new_metric)
                         sync_results['metrics_created'] += 1
