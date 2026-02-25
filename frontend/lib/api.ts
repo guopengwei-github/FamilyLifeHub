@@ -13,6 +13,7 @@ import {
   GarminConnection,
   GarminLoginRequest,
   GarminSyncResponse,
+  GarminActivitiesResponse,
   StravaConnection,
   StravaActivity,
   StravaActivitiesResponse,
@@ -383,6 +384,18 @@ export async function verifyGarminMfa(
     method: 'POST',
     body: JSON.stringify({ mfa_token: mfaToken, mfa_session_id: mfaSessionId }),
   });
+}
+
+/**
+ * Get Garmin activities for a specific date
+ */
+export async function getGarminActivities(
+  userId: number,
+  date: string
+): Promise<GarminActivitiesResponse> {
+  return fetchAPI<GarminActivitiesResponse>(
+    `/api/v1/garmin/activities?user_id=${userId}&date=${date}`
+  );
 }
 
 // ============ Strava Endpoints ============

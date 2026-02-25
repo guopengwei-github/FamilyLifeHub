@@ -237,6 +237,7 @@ class GarminSyncResponse(BaseModel):
     days_synced: int = Field(..., description="Number of days synced")
     metrics_created: int = Field(..., description="Number of metrics created")
     metrics_updated: int = Field(..., description="Number of metrics updated")
+    activities_created: int = Field(default=0, description="Number of activities created")
     errors: List[str] = Field(default_factory=list, description="Any errors during sync")
     last_sync_at: Optional[datetime] = Field(None, description="Timestamp of this sync")
 
@@ -375,3 +376,36 @@ class SummaryResponse(BaseModel):
     user_name: str
     avatar: Optional[str] = None
     metrics: SummaryMetric
+
+
+# ============ Garmin Activity Schemas ============
+
+class GarminActivityResponse(BaseModel):
+    """Response schema for a single Garmin activity."""
+    id: int
+    user_id: int
+    date: date_type
+    garmin_activity_id: Optional[int] = None
+    activity_type: Optional[str] = None
+    activity_type_key: Optional[str] = None
+    name: Optional[str] = None
+    duration_seconds: Optional[int] = None
+    distance_meters: Optional[float] = None
+    calories: Optional[float] = None
+    average_heartrate: Optional[float] = None
+    max_heartrate: Optional[int] = None
+    avg_speed_mps: Optional[float] = None
+    max_speed_mps: Optional[float] = None
+    elevation_gain_meters: Optional[float] = None
+    start_time: Optional[datetime] = None
+    start_time_local: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class GarminActivitiesResponse(BaseModel):
+    """Response schema for Garmin activities list."""
+    activities: List[GarminActivityResponse]
+    count: int

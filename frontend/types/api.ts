@@ -180,8 +180,35 @@ export interface GarminSyncResponse {
   days_synced: number;
   metrics_created: number;
   metrics_updated: number;
+  activities_created?: number;
   errors: string[];
   last_sync_at: string | null;
+}
+
+export interface GarminActivity {
+  id: number;
+  user_id: number;
+  date: string;
+  garmin_activity_id: number | null;
+  activity_type: string | null;
+  activity_type_key: string | null;
+  name: string | null;
+  duration_seconds: number | null;
+  distance_meters: number | null;
+  calories: number | null;
+  average_heartrate: number | null;
+  max_heartrate: number | null;
+  avg_speed_mps: number | null;
+  max_speed_mps: number | null;
+  elevation_gain_meters: number | null;
+  start_time: string | null;
+  start_time_local: string | null;
+  created_at: string;
+}
+
+export interface GarminActivitiesResponse {
+  activities: GarminActivity[];
+  count: number;
 }
 
 export interface GarminMfaVerifyRequest {

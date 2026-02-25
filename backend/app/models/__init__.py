@@ -209,6 +209,43 @@ class StravaConnection(Base):
         return f"<StravaConnection(user_id={self.user_id}, status={self.sync_status})>"
 
 
+class GarminActivity(Base):
+    """
+    Detailed activity data from Garmin Connect.
+    Stores complete activity information including distance, duration, pace, heart rate, etc.
+    """
+    __tablename__ = "garmin_activities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
+    garmin_activity_id = Column(Integer, nullable=True, unique=True, index=True)
+
+    # Activity details
+    activity_type = Column(String(50), nullable=True)  # RUNNING, CYCLING, etc.
+    activity_type_key = Column(String(50), nullable=True)  # Garmin's type key
+    name = Column(String(255), nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    distance_meters = Column(Float, nullable=True)
+    calories = Column(Float, nullable=True)
+    average_heartrate = Column(Float, nullable=True)
+    max_heartrate = Column(Integer, nullable=True)
+    avg_speed_mps = Column(Float, nullable=True)
+    max_speed_mps = Column(Float, nullable=True)
+    elevation_gain_meters = Column(Float, nullable=True)
+
+    # Timestamps
+    start_time = Column(DateTime, nullable=True)
+    start_time_local = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"<GarminActivity(user_id={self.user_id}, type={self.activity_type}, date={self.date})>"
+
+
 class ActivityMetric(Base):
     """
     Detailed activity data from Strava.
