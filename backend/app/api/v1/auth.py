@@ -1,7 +1,10 @@
 """
 API endpoints for user authentication.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import uuid
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -16,7 +19,8 @@ from app.schemas import (
     UserRegister,
     UserResponse,
     Token,
-    PasswordChange
+    PasswordChange,
+    ProfileUpdate
 )
 
 router = APIRouter(tags=["Auth"])
@@ -146,3 +150,76 @@ async def change_password(
     db.commit()
 
     return {"message": "Password changed successfully"}
+
+
+@router.put("/profile", response_model=UserResponse)
+async def update_profile(
+    profile_data: ProfileUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update the current user's profile (name and/or avatar).
+    """
+    if profile_data.name is not None:
+        current_user.name = profile_data.name
+    if profile_data.avatar is not None:
+        current_user.avatar = profile_data.avatar
+
+    db.commit()
+    db.refresh(current_user)
+
+    return UserResponse.model_validate(current_user)
+
+
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
+
+
+@router.post("/avatar", response_model=UserResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload a new avatar image for the current user.
+    Accepts JPG, PNG, WebP. Max size: 2MB.
+    """
+    # Validate file extension
+    ext = Path(file.filename).suffix.lower() if file.filename else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # Read and validate file size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large. Max size: {MAX_FILE_SIZE // 1024 // 1024}MB"
+        )
+
+    # Delete old avatar if exists
+    if current_user.avatar and current_user.avatar.startswith("/uploads/avatars/"):
+        old_path = Path(__file__).parent.parent.parent.parent / current_user.avatar.lstrip("/")
+        if old_path.exists():
+            old_path.unlink()
+
+    # Save new avatar
+    filename = f"{current_user.id}_{uuid.uuid4().hex[:8]}{ext}"
+    uploads_dir = Path(__file__).parent.parent.parent.parent / "uploads" / "avatars"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    file_path = uploads_dir / filename
+
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    # Update user avatar URL
+    current_user.avatar = f"/uploads/avatars/{filename}"
+    db.commit()
+    db.refresh(current_user)
+
+    return UserResponse.model_validate(current_user)

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRegister, UserLogin } from '@/types/api';
-import { login, register, getCurrentUser, logout, getStoredUser } from '@/lib/api';
+import { login, register, getCurrentUser, logout, getStoredUser, setStoredUser } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
@@ -13,6 +13,7 @@ interface AuthContextType {
   register: (data: UserRegister) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -73,6 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  const handleUpdateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+    setStoredUser(updatedUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -83,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register: handleRegister,
         logout: handleLogout,
         refreshUser,
+        updateUser: handleUpdateUser,
       }}
     >
       {children}
