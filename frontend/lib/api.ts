@@ -14,15 +14,9 @@ import {
   GarminLoginRequest,
   GarminSyncResponse,
   GarminActivitiesResponse,
-  StravaConnection,
-  StravaActivity,
-  StravaActivitiesResponse,
-  StravaSyncResponse,
   UserPreference,
   type UserPreferenceUpdate as UserPreferenceUpdateType,
   type SummaryResponse,
-  type CardId,
-  CARD_IDS,
 } from '@/types/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -110,8 +104,8 @@ async function fetchAPI<T>(
 
     if (!response.ok) {
       // Handle 401 Unauthorized - clear token and redirect to login
-      // BUT: Garmin/Strava 401 errors are for external service auth, not user session
-      const isExternalServiceAuth = endpoint.startsWith('/api/v1/garmin/') || endpoint.startsWith('/api/v1/strava/');
+      // BUT: Garmin 401 errors are for external service auth, not user session
+      const isExternalServiceAuth = endpoint.startsWith('/api/v1/garmin/');
 
       if (response.status === 401 && typeof window !== 'undefined' && !isExternalServiceAuth) {
         clearAuthToken();
@@ -396,99 +390,6 @@ export async function getGarminActivities(
   return fetchAPI<GarminActivitiesResponse>(
     `/api/v1/garmin/activities?user_id=${userId}&date=${date}`
   );
-}
-
-// ============ Strava Endpoints ============
-
-/**
- * Get Strava app config status
- */
-export async function getStravaConfig(): Promise<{ has_config: boolean }> {
-  return fetchAPI('/api/v1/strava/config');
-}
-
-/**
- * Save Strava app credentials
- */
-export async function saveStravaConfig(clientId: string, clientSecret: string): Promise<{ message: string }> {
-  return fetchAPI('/api/v1/strava/config', {
-    method: 'POST',
-    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
-  });
-}
-
-/**
- * Get Strava authorization URL
- */
-export async function getStravaAuthUrl(redirectUri?: string): Promise<{ authorization_url: string }> {
-  const params = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
-  return fetchAPI(`/api/v1/strava/authorize${params}`);
-}
-
-/**
- * Handle Strava OAuth callback
- */
-export async function stravaCallback(code: string): Promise<StravaConnection> {
-  return fetchAPI<StravaConnection>('/api/v1/strava/callback', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
-  });
-}
-
-/**
- * Get Strava connection status
- */
-export async function getStravaConnection(): Promise<StravaConnection> {
-  return fetchAPI<StravaConnection>('/api/v1/strava/connection');
-}
-
-/**
- * Unlink Strava account
- */
-export async function unlinkStrava(): Promise<{ message: string }> {
-  return fetchAPI('/api/v1/strava/connection', {
-    method: 'DELETE',
-  });
-}
-
-/**
- * Trigger Strava data sync
- */
-export async function syncStrava(days: number = 30, afterDate?: string): Promise<StravaSyncResponse> {
-  const body: { days?: number; after_date?: string } = { days };
-  if (afterDate) {
-    body.after_date = afterDate;
-  }
-  return fetchAPI<StravaSyncResponse>('/api/v1/strava/sync', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-}
-
-/**
- * Get Strava activities
- */
-export async function getStravaActivities(
-  startDate?: string,
-  endDate?: string,
-  limit: number = 50,
-  activityType?: string
-): Promise<StravaActivitiesResponse> {
-  const params = new URLSearchParams();
-  if (startDate) params.append('start_date', startDate);
-  if (endDate) params.append('end_date', endDate);
-  params.append('limit', limit.toString());
-  if (activityType) params.append('activity_type', activityType);
-
-  const endpoint = `/api/v1/strava/activities${params.toString() ? `?${params}` : ''}`;
-  return fetchAPI<StravaActivitiesResponse>(endpoint);
-}
-
-/**
- * Get a single Strava activity
- */
-export async function getStravaActivity(activityId: number): Promise<StravaActivity> {
-  return fetchAPI<StravaActivity>(`/api/v1/strava/activities/${activityId}`);
 }
 
 // ============ Preferences Endpoints ============

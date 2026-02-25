@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date, datetime, timedelta
 from typing import List, Optional
-from app.models import User, HealthMetric, WorkMetric, UserPreference
+from app.models import User, HealthMetric, UserPreference
 from app.schemas import (
     DailyTrendData, OverviewMetric, UserPreferenceResponse, UserPreferenceUpdate,
     SummaryResponse, SummaryMetric
@@ -44,15 +44,6 @@ def get_user_daily_trends(
             HealthMetric.date == current_date
         ).first()
 
-        # Aggregate work metrics for this user and date
-        work_agg = db.query(
-            func.sum(WorkMetric.screen_time_minutes).label('total_work_minutes'),
-            func.avg(WorkMetric.focus_score).label('avg_focus_score')
-        ).filter(
-            WorkMetric.user_id == user_id,
-            func.date(WorkMetric.timestamp) == current_date
-        ).first()
-
         # Create trend data point
         trend = DailyTrendData(
             date=current_date,
@@ -64,9 +55,6 @@ def get_user_daily_trends(
             rem_sleep_hours=health.rem_sleep_hours if health else None,
             exercise_minutes=health.exercise_minutes if health else None,
             stress_level=health.stress_level if health else None,
-            total_work_minutes=work_agg.total_work_minutes if work_agg.total_work_minutes else None,
-            avg_focus_score=round(work_agg.avg_focus_score, 1) if work_agg.avg_focus_score else None,
-            # Garmin advanced metrics
             steps=health.steps if health else None,
             calories=health.calories if health else None,
             distance_km=health.distance_km if health else None,
@@ -110,15 +98,6 @@ def get_user_overview(db: Session, user_id: int, target_date: date = None) -> Li
         HealthMetric.date == target_date
     ).first()
 
-    # Aggregate work metrics
-    work_agg = db.query(
-        func.sum(WorkMetric.screen_time_minutes).label('total_work_minutes'),
-        func.avg(WorkMetric.focus_score).label('avg_focus_score')
-    ).filter(
-        WorkMetric.user_id == user_id,
-        func.date(WorkMetric.timestamp) == target_date
-    ).first()
-
     metric = OverviewMetric(
         user_id=user.id,
         user_name=user.name,
@@ -128,9 +107,6 @@ def get_user_overview(db: Session, user_id: int, target_date: date = None) -> Li
         rem_sleep_hours=health.rem_sleep_hours if health else None,
         exercise_minutes=health.exercise_minutes if health else None,
         stress_level=health.stress_level if health else None,
-        total_work_minutes=work_agg.total_work_minutes if work_agg.total_work_minutes else None,
-        avg_focus_score=round(work_agg.avg_focus_score, 1) if work_agg.avg_focus_score else None,
-        # Garmin advanced metrics
         steps=health.steps if health else None,
         calories=health.calories if health else None,
         distance_km=health.distance_km if health else None,
@@ -176,16 +152,6 @@ def get_daily_trends(
                 HealthMetric.date == current_date
             ).first()
 
-            # Aggregate work metrics for this user and date
-            # Calculate total work minutes and average focus score
-            work_agg = db.query(
-                func.sum(WorkMetric.screen_time_minutes).label('total_work_minutes'),
-                func.avg(WorkMetric.focus_score).label('avg_focus_score')
-            ).filter(
-                WorkMetric.user_id == user.id,
-                func.date(WorkMetric.timestamp) == current_date
-            ).first()
-
             # Create trend data point
             trend = DailyTrendData(
                 date=current_date,
@@ -197,9 +163,6 @@ def get_daily_trends(
                 rem_sleep_hours=health.rem_sleep_hours if health else None,
                 exercise_minutes=health.exercise_minutes if health else None,
                 stress_level=health.stress_level if health else None,
-                total_work_minutes=work_agg.total_work_minutes if work_agg.total_work_minutes else None,
-                avg_focus_score=round(work_agg.avg_focus_score, 1) if work_agg.avg_focus_score else None,
-                # Garmin advanced metrics
                 steps=health.steps if health else None,
                 calories=health.calories if health else None,
                 distance_km=health.distance_km if health else None,
@@ -240,15 +203,6 @@ def get_today_overview(db: Session, target_date: date = None) -> List[OverviewMe
             HealthMetric.date == target_date
         ).first()
 
-        # Aggregate work metrics
-        work_agg = db.query(
-            func.sum(WorkMetric.screen_time_minutes).label('total_work_minutes'),
-            func.avg(WorkMetric.focus_score).label('avg_focus_score')
-        ).filter(
-            WorkMetric.user_id == user.id,
-            func.date(WorkMetric.timestamp) == target_date
-        ).first()
-
         metric = OverviewMetric(
             user_id=user.id,
             user_name=user.name,
@@ -258,9 +212,6 @@ def get_today_overview(db: Session, target_date: date = None) -> List[OverviewMe
             rem_sleep_hours=health.rem_sleep_hours if health else None,
             exercise_minutes=health.exercise_minutes if health else None,
             stress_level=health.stress_level if health else None,
-            total_work_minutes=work_agg.total_work_minutes if work_agg.total_work_minutes else None,
-            avg_focus_score=round(work_agg.avg_focus_score, 1) if work_agg.avg_focus_score else None,
-            # Garmin advanced metrics
             steps=health.steps if health else None,
             calories=health.calories if health else None,
             distance_km=health.distance_km if health else None,
@@ -304,15 +255,6 @@ def get_user_summary(db: Session, user_id: int, target_date: date = None) -> dic
         HealthMetric.date == target_date
     ).first()
 
-    # Get work metrics aggregated for target date
-    work_metrics = db.query(
-        func.sum(WorkMetric.screen_time_minutes).label('total_minutes'),
-        func.avg(WorkMetric.focus_score).label('avg_focus')
-    ).filter(
-        WorkMetric.user_id == user_id,
-        func.date(WorkMetric.timestamp) == target_date
-    ).first()
-
     summary = {
         'date': target_date,
         'user_id': user.id,
@@ -322,7 +264,6 @@ def get_user_summary(db: Session, user_id: int, target_date: date = None) -> dic
             'sleep_hours': health_metric.sleep_hours if health_metric else None,
             'steps': getattr(health_metric, 'steps', None) if health_metric else None,
             'calories': getattr(health_metric, 'calories', None) if health_metric else None,
-            'work_hours': round(work_metrics.total_minutes / 60, 1) if work_metrics.total_minutes else None,
             'stress_level': health_metric.stress_level if health_metric else None,
         }
     }
@@ -353,8 +294,6 @@ def get_user_preferences(db: Session, user_id: int) -> UserPreferenceResponse:
             user_id=preference.user_id,
             show_sleep=preference.show_sleep,
             show_exercise=preference.show_exercise,
-            show_work_time=preference.show_work_time,
-            show_focus=preference.show_focus,
             show_stress=preference.show_stress,
             show_sleep_stages=preference.show_sleep_stages,
             hidden_cards=preference.hidden_cards,
@@ -369,8 +308,6 @@ def get_user_preferences(db: Session, user_id: int) -> UserPreferenceResponse:
             user_id=user_id,
             show_sleep=1,
             show_exercise=1,
-            show_work_time=1,
-            show_focus=1,
             show_stress=1,
             show_sleep_stages=1,
             hidden_cards=None,
@@ -400,8 +337,6 @@ def update_user_preferences(db: Session, user_id: int, preferences: UserPreferen
         # Update existing preferences
         existing.show_sleep = preferences.show_sleep
         existing.show_exercise = preferences.show_exercise
-        existing.show_work_time = preferences.show_work_time
-        existing.show_focus = preferences.show_focus
         existing.show_stress = preferences.show_stress
         existing.show_sleep_stages = preferences.show_sleep_stages
         # Update new fields if provided
@@ -417,8 +352,6 @@ def update_user_preferences(db: Session, user_id: int, preferences: UserPreferen
             user_id=existing.user_id,
             show_sleep=existing.show_sleep,
             show_exercise=existing.show_exercise,
-            show_work_time=existing.show_work_time,
-            show_focus=existing.show_focus,
             show_stress=existing.show_stress,
             show_sleep_stages=existing.show_sleep_stages,
             hidden_cards=existing.hidden_cards,
@@ -433,8 +366,6 @@ def update_user_preferences(db: Session, user_id: int, preferences: UserPreferen
             user_id=user_id,
             show_sleep=preferences.show_sleep,
             show_exercise=preferences.show_exercise,
-            show_work_time=preferences.show_work_time,
-            show_focus=preferences.show_focus,
             show_stress=preferences.show_stress,
             show_sleep_stages=preferences.show_sleep_stages,
             hidden_cards=preferences.hidden_cards,
@@ -448,8 +379,6 @@ def update_user_preferences(db: Session, user_id: int, preferences: UserPreferen
             user_id=new_preference.user_id,
             show_sleep=new_preference.show_sleep,
             show_exercise=new_preference.show_exercise,
-            show_work_time=new_preference.show_work_time,
-            show_focus=new_preference.show_focus,
             show_stress=new_preference.show_stress,
             show_sleep_stages=new_preference.show_sleep_stages,
             hidden_cards=new_preference.hidden_cards,

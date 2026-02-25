@@ -40,12 +40,6 @@ export function UserSummaryCard({ summary, currentUser, viewingUser }: UserSumma
       color: 'text-orange-500',
     },
     {
-      icon: Clock,
-      value: metrics.work_hours ? `${metrics.work_hours.toFixed(1)}h` : 'N/A',
-      label: 'Work',
-      color: 'text-purple-500',
-    },
-    {
       icon: Heart,
       value: metrics.stress_level ? `${metrics.stress_level}` : 'N/A',
       label: 'Stress',

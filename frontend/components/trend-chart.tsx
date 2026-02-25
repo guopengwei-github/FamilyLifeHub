@@ -1,6 +1,6 @@
 /**
  * Trend Chart Component
- * Displays sleep vs work load correlation using dual Y-axis line chart
+ * Displays sleep vs steps correlation using dual Y-axis line chart
  */
 'use client';
 
@@ -32,9 +32,9 @@ export function TrendChart({ data, startDate, endDate }: TrendChartProps) {
       acc[dateKey] = {
         date: dateKey,
         totalSleep: 0,
-        totalWork: 0,
+        totalSteps: 0,
         sleepCount: 0,
-        workCount: 0,
+        stepsCount: 0,
       };
     }
 
@@ -43,9 +43,9 @@ export function TrendChart({ data, startDate, endDate }: TrendChartProps) {
       acc[dateKey].sleepCount += 1;
     }
 
-    if (item.total_work_minutes !== null) {
-      acc[dateKey].totalWork += item.total_work_minutes / 60; // Convert to hours
-      acc[dateKey].workCount += 1;
+    if (item.steps !== null) {
+      acc[dateKey].totalSteps += item.steps;
+      acc[dateKey].stepsCount += 1;
     }
 
     return acc;
@@ -55,15 +55,15 @@ export function TrendChart({ data, startDate, endDate }: TrendChartProps) {
   const chartData = Object.values(aggregatedData).map((item: any) => ({
     date: format(new Date(item.date), 'MM/dd'),
     sleep: item.sleepCount > 0 ? (item.totalSleep / item.sleepCount).toFixed(1) : null,
-    work: item.workCount > 0 ? (item.totalWork / item.workCount).toFixed(1) : null,
+    steps: item.stepsCount > 0 ? Math.round(item.totalSteps / item.stepsCount) : null,
   }));
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sleep vs Work Load Trends</CardTitle>
+        <CardTitle>睡眠与步数趋势</CardTitle>
         <CardDescription>
-          Analyzing correlation between work hours and sleep quality
+          分析睡眠时长与日常活动量的关系
           ({format(new Date(startDate), 'MMM dd')} - {format(new Date(endDate), 'MMM dd')})
         </CardDescription>
       </CardHeader>
@@ -74,17 +74,16 @@ export function TrendChart({ data, startDate, endDate }: TrendChartProps) {
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12 }}
-              label={{ value: 'Date', position: 'insideBottom', offset: -5 }}
             />
             <YAxis
               yAxisId="left"
-              label={{ value: 'Work Hours', angle: -90, position: 'insideLeft' }}
+              label={{ value: '步数', angle: -90, position: 'insideLeft' }}
               tick={{ fontSize: 12 }}
             />
             <YAxis
               yAxisId="right"
               orientation="right"
-              label={{ value: 'Sleep Hours', angle: 90, position: 'insideRight' }}
+              label={{ value: '睡眠(小时)', angle: 90, position: 'insideRight' }}
               tick={{ fontSize: 12 }}
             />
             <Tooltip
@@ -98,10 +97,10 @@ export function TrendChart({ data, startDate, endDate }: TrendChartProps) {
             <Line
               yAxisId="left"
               type="monotone"
-              dataKey="work"
-              stroke="#f97316"
+              dataKey="steps"
+              stroke="#22c55e"
               strokeWidth={2}
-              name="Work Hours"
+              name="步数"
               dot={{ r: 4 }}
               connectNulls
             />
@@ -111,7 +110,7 @@ export function TrendChart({ data, startDate, endDate }: TrendChartProps) {
               dataKey="sleep"
               stroke="#3b82f6"
               strokeWidth={2}
-              name="Sleep Hours"
+              name="睡眠"
               dot={{ r: 4 }}
               connectNulls
             />

@@ -100,42 +100,6 @@ class HealthMetricResponse(HealthMetricBase):
         from_attributes = True
 
 
-# ============ Work Metric Schemas ============
-
-class WorkMetricBase(BaseModel):
-    """Base work metric schema."""
-    timestamp: datetime = Field(..., description="Timestamp of the metric (UTC)")
-    screen_time_minutes: Optional[int] = Field(None, ge=0, description="Screen time in minutes")
-    focus_score: Optional[int] = Field(None, ge=0, le=100, description="Focus score (0-100)")
-    active_window_category: Optional[str] = Field(None, max_length=50, description="Active window category")
-
-    @field_validator('active_window_category')
-    @classmethod
-    def validate_category(cls, v):
-        """Validate active window category."""
-        if v is not None:
-            allowed_categories = ["coding", "browsing", "gaming", "communication", "productivity", "other"]
-            if v.lower() not in allowed_categories:
-                # Allow any category but normalize to lowercase
-                return v.lower()
-        return v
-
-
-class WorkMetricCreate(WorkMetricBase):
-    """Schema for creating work metrics."""
-    user_id: int = Field(..., description="User ID")
-
-
-class WorkMetricResponse(WorkMetricBase):
-    """Schema for work metric response."""
-    id: int
-    user_id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 # ============ Dashboard Schemas ============
 
 class DailyTrendData(BaseModel):
@@ -147,8 +111,6 @@ class DailyTrendData(BaseModel):
     light_sleep_hours: Optional[float] = None
     deep_sleep_hours: Optional[float] = None
     rem_sleep_hours: Optional[float] = None
-    total_work_minutes: Optional[int] = None
-    avg_focus_score: Optional[float] = None
     exercise_minutes: Optional[int] = None
     stress_level: Optional[int] = None
     # Garmin advanced metrics
@@ -178,8 +140,6 @@ class OverviewMetric(BaseModel):
     deep_sleep_hours: Optional[float] = None
     rem_sleep_hours: Optional[float] = None
     exercise_minutes: Optional[int] = None
-    total_work_minutes: Optional[int] = None
-    avg_focus_score: Optional[float] = None
     stress_level: Optional[int] = None
     # Garmin advanced metrics
     steps: Optional[int] = None
@@ -242,95 +202,12 @@ class GarminSyncResponse(BaseModel):
     last_sync_at: Optional[datetime] = Field(None, description="Timestamp of this sync")
 
 
-# ============ Strava Schemas ============
-
-class StravaAppConfig(BaseModel):
-    """Schema for user's Strava app credentials."""
-    client_id: str = Field(..., min_length=1, description="Strava Client ID")
-    client_secret: str = Field(..., min_length=1, description="Strava Client Secret")
-
-
-class StravaAppConfigResponse(BaseModel):
-    """Response schema for Strava app config status."""
-    has_config: bool = Field(..., description="Whether user has configured Strava app credentials")
-
-
-class StravaAuthUrlResponse(BaseModel):
-    """Response schema for Strava authorization URL."""
-    authorization_url: str = Field(..., description="OAuth authorization URL")
-
-
-class StravaCallbackRequest(BaseModel):
-    """Schema for Strava OAuth callback."""
-    code: str = Field(..., description="Authorization code from Strava")
-    state: Optional[str] = Field(None, description="Optional state parameter")
-
-
-class StravaConnectionResponse(BaseModel):
-    """Response schema for Strava connection status."""
-    connected: bool = Field(..., description="Whether Strava is connected")
-    athlete_name: Optional[str] = Field(None, description="Strava athlete name")
-    athlete_id: Optional[int] = Field(None, description="Strava athlete ID")
-    athlete_profile: Optional[str] = Field(None, description="Strava profile URL")
-    created_at: Optional[datetime] = Field(None, description="Connection created timestamp")
-    last_sync_at: Optional[datetime] = Field(None, description="Last successful sync timestamp")
-    sync_status: str = Field(..., description="Connection status: connected/error/expired")
-
-
-class StravaSyncRequest(BaseModel):
-    """Schema for triggering Strava sync."""
-    days: int = Field(30, ge=1, le=365, description="Number of days to sync (1-365)")
-    after_date: Optional[date_type] = Field(None, description="Start date (overrides days)")
-
-
-class StravaSyncResponse(BaseModel):
-    """Response schema for Strava sync operation."""
-    success: bool = Field(..., description="Whether sync was successful")
-    activities_synced: int = Field(..., description="Number of activities synced")
-    metrics_updated: int = Field(..., description="Number of health metrics updated")
-    errors: List[str] = Field(default_factory=list, description="Any errors during sync")
-    last_sync_at: Optional[datetime] = Field(None, description="Timestamp of this sync")
-
-
-class StravaActivityResponse(BaseModel):
-    """Response schema for a single Strava activity."""
-    id: int
-    user_id: int
-    strava_activity_id: Optional[int] = None
-    date: date_type
-    activity_type: Optional[str] = None
-    name: Optional[str] = None
-    distance_meters: Optional[float] = None
-    moving_time_seconds: Optional[int] = None
-    elapsed_time_seconds: Optional[int] = None
-    average_speed_mps: Optional[float] = None
-    max_speed_mps: Optional[float] = None
-    average_heartrate: Optional[float] = None
-    max_heartrate: Optional[int] = None
-    elevation_gain_meters: Optional[float] = None
-    calories: Optional[float] = None
-    start_date: Optional[datetime] = None
-    start_date_local: Optional[datetime] = None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class StravaActivitiesResponse(BaseModel):
-    """Response schema for Strava activities list."""
-    activities: List[StravaActivityResponse]
-    count: int
-
-
 # ============ User Preference Schemas ============
 
 class UserPreferenceBase(BaseModel):
     """Base user preference schema."""
     show_sleep: int = Field(1, ge=0, le=1, description="Show sleep metrics (0 or 1)")
     show_exercise: int = Field(1, ge=0, le=1, description="Show exercise metrics (0 or 1)")
-    show_work_time: int = Field(1, ge=0, le=1, description="Show work time metrics (0 or 1)")
-    show_focus: int = Field(1, ge=0, le=1, description="Show focus score (0 or 1)")
     show_stress: int = Field(1, ge=0, le=1, description="Show stress level (0 or 1)")
     show_sleep_stages: int = Field(1, ge=0, le=1, description="Show sleep stages (0 or 1)")
     hidden_cards: Optional[str] = Field(None, description="JSON string of hidden card IDs")
@@ -365,7 +242,6 @@ class SummaryMetric(BaseModel):
     sleep_hours: Optional[float] = None
     steps: Optional[int] = None
     calories: Optional[int] = None
-    work_hours: Optional[float] = None
     stress_level: Optional[int] = None
 
 

@@ -26,12 +26,6 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: Union[str, List[str]] = ["http://localhost:3000", "http://localhost:3001"]
 
-    # Strava OAuth Configuration
-    # Create your Strava app at: https://www.strava.com/settings/api
-    strava_client_id: str = ""
-    strava_client_secret: str = ""
-    strava_redirect_uri: str = "http://localhost:8000/api/v1/strava/callback"
-
     @field_validator('allowed_origins', mode='before')
     @classmethod
     def parse_allowed_origins(cls, v):

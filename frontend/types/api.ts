@@ -75,18 +75,6 @@ export interface HealthMetricForm {
   sleep_score?: number;
 }
 
-// ============ Work Types ============
-
-export interface WorkMetric {
-  id: number;
-  user_id: number;
-  timestamp: string;
-  screen_time_minutes: number | null;
-  focus_score: number | null;
-  active_window_category: string | null;
-  created_at: string;
-}
-
 // ============ Dashboard Types ============
 
 export interface OverviewMetric {
@@ -97,8 +85,6 @@ export interface OverviewMetric {
   deep_sleep_hours: number | null;
   rem_sleep_hours: number | null;
   exercise_minutes: number | null;
-  total_work_minutes: number | null;
-  avg_focus_score: number | null;
   stress_level: number | null;
   // Garmin advanced metrics
   steps: number | null;
@@ -124,8 +110,6 @@ export interface DailyTrendData {
   light_sleep_hours: number | null;
   deep_sleep_hours: number | null;
   rem_sleep_hours: number | null;
-  total_work_minutes: number | null;
-  avg_focus_score: number | null;
   exercise_minutes: number | null;
   stress_level: number | null;
   // Garmin advanced metrics
@@ -216,66 +200,6 @@ export interface GarminMfaVerifyRequest {
   mfa_session_id: string;
 }
 
-// ============ Strava Types ============
-
-export interface StravaAppConfig {
-  client_id: string;
-  client_secret: string;
-}
-
-export interface StravaAppConfigResponse {
-  has_config: boolean;
-}
-
-export interface StravaConnection {
-  connected: boolean;
-  athlete_name: string | null;
-  athlete_id: number | null;
-  athlete_profile: string | null;
-  created_at: string | null;
-  last_sync_at: string | null;
-  sync_status: string;
-}
-
-export interface StravaActivity {
-  id: number;
-  user_id: number;
-  strava_activity_id: number | null;
-  date: string;
-  activity_type: string | null;
-  name: string | null;
-  distance_meters: number | null;
-  moving_time_seconds: number | null;
-  elapsed_time_seconds: number | null;
-  average_speed_mps: number | null;
-  max_speed_mps: number | null;
-  average_heartrate: number | null;
-  max_heartrate: number | null;
-  elevation_gain_meters: number | null;
-  calories: number | null;
-  start_date: string | null;
-  start_date_local: string | null;
-  created_at: string;
-}
-
-export interface StravaActivitiesResponse {
-  activities: StravaActivity[];
-  count: number;
-}
-
-export interface StravaSyncRequest {
-  days?: number;
-  after_date?: string;
-}
-
-export interface StravaSyncResponse {
-  success: boolean;
-  activities_synced: number;
-  metrics_updated: number;
-  errors: string[];
-  last_sync_at: string | null;
-}
-
 // ============ User Preference Types ============
 
 export interface UserPreference {
@@ -283,8 +207,6 @@ export interface UserPreference {
   user_id: number;
   show_sleep: number;
   show_exercise: number;
-  show_work_time: number;
-  show_focus: number;
   show_stress: number;
   show_sleep_stages: number;
   hidden_cards?: string | null;
@@ -296,8 +218,6 @@ export interface UserPreference {
 export interface UserPreferenceUpdate {
   show_sleep?: number;
   show_exercise?: number;
-  show_work_time?: number;
-  show_focus?: number;
   show_stress?: number;
   show_sleep_stages?: number;
   hidden_cards?: string;
@@ -310,7 +230,6 @@ export interface SummaryMetric {
   sleep_hours: number | null;
   steps: number | null;
   calories: number | null;
-  work_hours: number | null;
   stress_level: number | null;
 }
 
@@ -327,7 +246,6 @@ export interface SummaryResponse {
 export const CARD_IDS = {
   SLEEP: 'sleep',
   ACTIVITY_HEALTH: 'activity_health',
-  WORK: 'work',
   STRESS: 'stress',
   TRENDS: 'trends'
 } as const;

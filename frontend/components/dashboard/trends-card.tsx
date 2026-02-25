@@ -169,9 +169,6 @@ export function TrendsCard({
   const currentWeekStress = calculateWeeklyAverage((d) => d.stress_level ?? null);
   const previousWeekStress = calculatePreviousWeekAverage((d) => d.stress_level ?? null);
 
-  const currentWeekWork = calculateWeeklyAverage((d) => (d.total_work_minutes ?? null) ? (d.total_work_minutes! / 60) : null);
-  const previousWeekWork = calculatePreviousWeekAverage((d) => (d.total_work_minutes ?? null) ? (d.total_work_minutes! / 60) : null);
-
   // Get trend line data for the chart
   const getTrendLine = (getValue: (d: DailyTrendData) => number | null, count = 14) => {
     if (!trends || trends.data.length === 0) return [];
@@ -182,7 +179,6 @@ export function TrendsCard({
   const sleepTrend = getTrendLine((d) => d.sleep_hours ?? null);
   const exerciseTrend = getTrendLine((d) => d.exercise_minutes ?? null);
   const stressTrend = getTrendLine((d) => d.stress_level ?? null);
-  const workTrend = getTrendLine((d) => (d.total_work_minutes ?? null) ? (d.total_work_minutes! / 60) : null);
 
   return (
     <Card className={className}>
@@ -257,18 +253,6 @@ export function TrendsCard({
                 </div>
               </div>
 
-              {/* Work Trend */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">工作</span>
-                  <span className="text-sm font-medium">
-                    {currentWeekWork ? `${currentWeekWork.toFixed(1)}h` : 'N/A'}
-                  </span>
-                </div>
-                <div className="h-12">
-                  <MiniSparkline data={workTrend} color="#3b82f6" />
-                </div>
-              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
@@ -305,15 +289,6 @@ export function TrendsCard({
               unit=""
               color="#ef4444"
               icon="❤️"
-            />
-
-            <MetricTrendItem
-              label="平均工作"
-              currentValue={currentWeekWork}
-              previousValue={previousWeekWork}
-              unit="h"
-              color="#3b82f6"
-              icon="💼"
             />
           </div>
         </div>
