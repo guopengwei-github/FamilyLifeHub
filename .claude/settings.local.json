@@ -77,7 +77,8 @@
       "Bash(done)",
       "Bash(ls:*)",
       "Bash(if not exist \"D:\\\\ai\\\\family_life_hub\\\\docs\\\\plans\" mkdir \"D:\\\\ai\\\\family_life_hub\\\\docs\\\\plans\")",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(cmd //c \"venv\\\\Scripts\\\\activate && python main.py\")"
     ]
   }
 }
