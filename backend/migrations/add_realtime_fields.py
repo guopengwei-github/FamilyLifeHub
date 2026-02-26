@@ -1,6 +1,5 @@
 """
-Add missing sleep stage columns (light_sleep_hours, deep_sleep_hours, rem_sleep_hours)
-to health_metrics table.
+Add HRV (Heart Rate Variability) columns to health_metrics table.
 Run this script to update the database schema.
 """
 import sqlite3
@@ -14,7 +13,7 @@ from app.core.config import settings
 
 
 def migrate():
-    """Add missing columns to health_metrics table."""
+    """Add missing HRV columns to health_metrics table."""
     db_path = settings.database_path.replace("sqlite:///", "").replace("sqlite://", "")
 
     if not os.path.exists(db_path):
@@ -30,12 +29,12 @@ def migrate():
         columns = [col[1] for col in cursor.fetchall()]
 
         columns_to_add = []
-        if "light_sleep_hours" not in columns:
-            columns_to_add.append("light_sleep_hours FLOAT")
-        if "deep_sleep_hours" not in columns:
-            columns_to_add.append("deep_sleep_hours FLOAT")
-        if "rem_sleep_hours" not in columns:
-            columns_to_add.append("rem_sleep_hours FLOAT")
+        if "hrv_last_night" not in columns:
+            columns_to_add.append("hrv_last_night INTEGER")
+        if "hrv_weekly_avg" not in columns:
+            columns_to_add.append("hrv_weekly_avg INTEGER")
+        if "hrv_status" not in columns:
+            columns_to_add.append("hrv_status VARCHAR(50)")
 
         if not columns_to_add:
             print("Database schema is up to date. No migration needed.")

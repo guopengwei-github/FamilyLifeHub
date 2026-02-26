@@ -91,6 +91,9 @@ class HealthMetric(Base):
     respiration_rate = Column(Float, nullable=True)  # 呼吸频率 (次/分)
     resting_hr = Column(Integer, nullable=True)  # 静息心率 (BPM)
     sleep_score = Column(Integer, nullable=True)  # 睡眠质量评分 (0-100)
+    hrv_last_night = Column(Integer, nullable=True)  # 昨晚HRV平均值 (ms)
+    hrv_weekly_avg = Column(Integer, nullable=True)  # 周平均HRV (ms)
+    hrv_status = Column(String(50), nullable=True)  # HRV状态 (e.g., "balanced", "unbalanced")
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

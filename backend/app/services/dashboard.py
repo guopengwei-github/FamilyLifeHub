@@ -62,7 +62,10 @@ def get_user_daily_trends(
             spo2=health.spo2 if health else None,
             respiration_rate=health.respiration_rate if health else None,
             resting_hr=health.resting_hr if health else None,
-            sleep_score=health.sleep_score if health else None
+            sleep_score=health.sleep_score if health else None,
+            hrv_last_night=health.hrv_last_night if health else None,
+            hrv_weekly_avg=health.hrv_weekly_avg if health else None,
+            hrv_status=health.hrv_status if health else None
         )
         trends.append(trend)
 
@@ -114,7 +117,10 @@ def get_user_overview(db: Session, user_id: int, target_date: date = None) -> Li
         spo2=health.spo2 if health else None,
         respiration_rate=health.respiration_rate if health else None,
         resting_hr=health.resting_hr if health else None,
-        sleep_score=health.sleep_score if health else None
+        sleep_score=health.sleep_score if health else None,
+        hrv_last_night=health.hrv_last_night if health else None,
+        hrv_weekly_avg=health.hrv_weekly_avg if health else None,
+        hrv_status=health.hrv_status if health else None
     )
     overview.append(metric)
 
@@ -170,7 +176,10 @@ def get_daily_trends(
                 spo2=health.spo2 if health else None,
                 respiration_rate=health.respiration_rate if health else None,
                 resting_hr=health.resting_hr if health else None,
-                sleep_score=health.sleep_score if health else None
+                sleep_score=health.sleep_score if health else None,
+                hrv_last_night=health.hrv_last_night if health else None,
+                hrv_weekly_avg=health.hrv_weekly_avg if health else None,
+                hrv_status=health.hrv_status if health else None
             )
             trends.append(trend)
 
@@ -219,7 +228,10 @@ def get_today_overview(db: Session, target_date: date = None) -> List[OverviewMe
             spo2=health.spo2 if health else None,
             respiration_rate=health.respiration_rate if health else None,
             resting_hr=health.resting_hr if health else None,
-            sleep_score=health.sleep_score if health else None
+            sleep_score=health.sleep_score if health else None,
+            hrv_last_night=health.hrv_last_night if health else None,
+            hrv_weekly_avg=health.hrv_weekly_avg if health else None,
+            hrv_status=health.hrv_status if health else None
         )
         overview.append(metric)
 
