@@ -12,6 +12,8 @@ import {
   updateHiddenCards,
   getUserPreferences,
   listUsers,
+  getGarminConnection,
+  syncGarmin,
 } from '@/lib/api';
 import {
   SummaryResponse,
@@ -21,6 +23,7 @@ import {
   CardId,
   CARD_IDS,
   User,
+  GarminConnection,
 } from '@/types/api';
 import { UserSummaryCard } from '@/components/dashboard/user-summary-card';
 import { SleepCard } from '@/components/dashboard/sleep-card';
@@ -33,8 +36,19 @@ import { MemberDetailPanel } from '@/components/dashboard/member-detail-panel';
 import { CardSettingsPanel } from '@/components/dashboard/card-settings-panel';
 import { DateNavigator } from '@/components/dashboard/date-navigator';
 import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
+
+// Garmin sync status types
+type GarminSyncStatus = 'not_connected' | 'fresh' | 'stale' | 'severely_stale' | 'syncing' | 'error';
+
+interface GarminSyncState {
+  status: GarminSyncStatus;
+  hoursAgo?: number;
+  lastSyncAt?: Date | null;
+}
 
 export default function DashboardPage() {
+  const router = useRouter();
   // Auth state
   const { user: authUser } = useAuth();
 
@@ -43,6 +57,9 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [trends, setTrends] = useState<TrendResponse | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+
+  // Garmin sync state
+  const [garminSyncState, setGarminSyncState] = useState<GarminSyncState>({ status: 'not_connected' });
 
   // User states
   const [viewingUser, setViewingUser] = useState<User | null>(null);
@@ -69,6 +86,58 @@ export default function DashboardPage() {
     } catch (err) {
       console.error('Error fetching users:', err);
       return [];
+    }
+  };
+
+  // Calculate Garmin sync status from connection
+  const calculateGarminSyncState = (connection: GarminConnection): GarminSyncState => {
+    if (!connection.connected) {
+      return { status: 'not_connected' };
+    }
+
+    if (!connection.last_sync_at) {
+      return { status: 'stale' };
+    }
+
+    const now = new Date();
+    const lastSync = new Date(connection.last_sync_at);
+    const hoursDiff = (now.getTime() - lastSync.getTime()) / (1000 * 60 * 60);
+
+    if (hoursDiff < 24) {
+      return { status: 'fresh', hoursAgo: hoursDiff, lastSyncAt: lastSync };
+    } else if (hoursDiff >= 72) {
+      return { status: 'severely_stale', hoursAgo: hoursDiff, lastSyncAt: lastSync };
+    } else {
+      return { status: 'stale', hoursAgo: hoursDiff, lastSyncAt: lastSync };
+    }
+  };
+
+  // Fetch Garmin connection status
+  const fetchGarminConnection = async () => {
+    try {
+      const connection = await getGarminConnection();
+      setGarminSyncState(calculateGarminSyncState(connection));
+    } catch (err) {
+      console.error('Error fetching Garmin connection:', err);
+      setGarminSyncState({ status: 'not_connected' });
+    }
+  };
+
+  // Handle Garmin sync
+  const handleGarminSync = async () => {
+    setGarminSyncState((prev) => ({ ...prev, status: 'syncing' }));
+
+    try {
+      await syncGarmin(7);
+      // Refresh Garmin connection state
+      await fetchGarminConnection();
+      // Refresh dashboard data
+      if (viewingUser) {
+        await fetchUserData(viewingUser, selectedDate);
+      }
+    } catch (err) {
+      console.error('Error syncing Garmin:', err);
+      setGarminSyncState((prev) => ({ ...prev, status: 'error' }));
     }
   };
 
@@ -139,6 +208,9 @@ export default function DashboardPage() {
       if (!viewingUser) {
         setViewingUser(authUser);
       }
+
+      // Fetch Garmin connection status
+      await fetchGarminConnection();
     };
     init();
   }, [authUser]);
@@ -259,6 +331,8 @@ export default function DashboardPage() {
                 summary={summary}
                 currentUser={authUser}
                 viewingUser={viewingUser}
+                garminSyncState={garminSyncState}
+                onGarminSync={handleGarminSync}
               />
 
               {/* Dashboard Cards Grid */}

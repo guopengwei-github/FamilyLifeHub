@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -72,7 +72,7 @@ async def update_hidden_cards(
 
     if preference:
         preference.hidden_cards = data.hidden_cards
-        preference.updated_at = datetime.utcnow()
+        preference.updated_at = datetime.now(timezone.utc)
     else:
         # Create if not exists
         preference = UserPreference(

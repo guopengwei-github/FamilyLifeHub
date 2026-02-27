@@ -24,6 +24,15 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
 
+/**
+ * Convert relative avatar path to full URL pointing to backend server
+ */
+export function getAvatarUrl(avatar: string | null | undefined): string | undefined {
+  if (!avatar) return undefined;
+  if (avatar.startsWith('http')) return avatar;
+  return `${API_URL}${avatar}`;
+}
+
 // ============ Token Management ============
 
 /**

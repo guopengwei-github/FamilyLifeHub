@@ -6,7 +6,7 @@ from garth.sso import login as garth_login, resume_login
 from garth.exc import GarthHTTPError, GarthException
 from garth.stats import DailySteps, DailyIntensityMinutes, DailyHRV, DailyStress
 from garth import DailyBodyBatteryStress
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Dict, List, Optional, Any, Tuple
 import logging
 import secrets
@@ -33,7 +33,7 @@ _MFA_SESSION_TIMEOUT = timedelta(minutes=10)
 
 def cleanup_expired_mfa_sessions():
     """Remove expired MFA sessions from the in-memory store."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expired_sessions = [
         session_id
         for session_id, session_data in _mfa_sessions.items()
@@ -67,7 +67,7 @@ def store_mfa_session(client: Client, signin_params: dict, is_cn: bool = False, 
         "is_cn": is_cn,
         "username": username,
         "password": password,
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc)
     }
     logger.info(f"Stored MFA session: {session_id[:16]}...")
     return session_id
@@ -1129,7 +1129,7 @@ def refresh_garmin_data(
                         for field, value in metric_data.items():
                             if field not in ['user_id', 'date'] and value is not None:
                                 setattr(existing_metric, field, value)
-                        existing_metric.updated_at = datetime.utcnow()
+                        existing_metric.updated_at = datetime.now(timezone.utc)
                         sync_results['metrics_updated'] += 1
                     else:
                         logger.info(f"Creating new metric for {current_date}")
@@ -1151,12 +1151,13 @@ def refresh_garmin_data(
 
         # Commit changes and update connection
         db.commit()
-        connection.last_sync_at = datetime.utcnow()
+        connection.last_sync_at = datetime.now(timezone.utc)
         connection.sync_status = "connected"
         connection.last_error = None
         db.commit()
 
         sync_results['success'] = True
+        sync_results['last_sync_at'] = datetime.now(timezone.utc)
         return sync_results
 
     finally:
@@ -1228,7 +1229,7 @@ def save_garmin_connection(
             existing.garmin_user_id = garmin_user_id or existing.garmin_user_id
             existing.garmin_display_name = garmin_display_name or existing.garmin_display_name
             existing.is_cn = 1 if is_cn else 0
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(timezone.utc)
             existing.sync_status = "connected"
             existing.last_error = None
             db.commit()

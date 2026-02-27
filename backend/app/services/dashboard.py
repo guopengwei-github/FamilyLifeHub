@@ -3,7 +3,7 @@ Service layer for dashboard data aggregation and calculations.
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 from app.models import User, HealthMetric, UserPreference
 from app.schemas import (
@@ -324,8 +324,8 @@ def get_user_preferences(db: Session, user_id: int) -> UserPreferenceResponse:
             show_sleep_stages=1,
             hidden_cards=None,
             default_view_tab='activity',
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
 
 
@@ -356,7 +356,7 @@ def update_user_preferences(db: Session, user_id: int, preferences: UserPreferen
             existing.hidden_cards = preferences.hidden_cards
         if preferences.default_view_tab is not None:
             existing.default_view_tab = preferences.default_view_tab
-        existing.updated_at = datetime.utcnow()
+        existing.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(existing)
         return UserPreferenceResponse(

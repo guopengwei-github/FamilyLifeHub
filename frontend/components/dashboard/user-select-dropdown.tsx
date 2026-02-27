@@ -5,6 +5,7 @@ import { Check, ChevronDown } from 'lucide-react';
 import { User } from '@/types/api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { getAvatarUrl } from '@/lib/api';
 
 interface UserSelectDropdownProps {
   users: User[];
@@ -62,7 +63,7 @@ export function UserSelectDropdown({
     return (
       <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50', className)}>
         <Avatar className="h-5 w-5">
-          <AvatarImage src={currentUser?.avatar || undefined} />
+          <AvatarImage src={getAvatarUrl(currentUser?.avatar)} />
           <AvatarFallback className="text-xs">
             {currentUser ? getInitials(currentUser.name) : '??'}
           </AvatarFallback>
@@ -87,7 +88,7 @@ export function UserSelectDropdown({
         )}
       >
         <Avatar className="h-5 w-5">
-          <AvatarImage src={viewingUser?.avatar || undefined} />
+          <AvatarImage src={getAvatarUrl(viewingUser?.avatar)} />
           <AvatarFallback className="text-xs">
             {viewingUser ? getInitials(viewingUser.name) : '??'}
           </AvatarFallback>
@@ -121,7 +122,7 @@ export function UserSelectDropdown({
                   )}
                 >
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar || undefined} />
+                    <AvatarImage src={getAvatarUrl(user.avatar)} />
                     <AvatarFallback className="text-sm bg-primary/10">
                       {getInitials(user.name)}
                     </AvatarFallback>

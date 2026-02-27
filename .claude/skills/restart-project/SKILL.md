@@ -41,7 +41,8 @@ description: 重启 FamilyLifeHub 项目的前后端服务。当用户说"重启
 
 3. **后台启动后端服务**
    ```bash
-   cd D:/ai/family_life_hub/backend && venv/Scripts/python.exe main.py
+   cd D:/ai/family_life_hub/backend 
+   venv/Scripts/python.exe main.py
    ```
 
 4. **后台启动前端服务**
@@ -49,24 +50,20 @@ description: 重启 FamilyLifeHub 项目的前后端服务。当用户说"重启
    cd D:/ai/family_life_hub/frontend && npm run dev
    ```
 
-5. **验证服务启动成功**
-   - 后端：http://localhost:8000
-   - 前端：http://localhost:3000
-
 ## 4. 核心代码与配置参考
 
 ### 完整重启脚本（Windows Git Bash）
 
 ```bash
 # 1. 查找并记录占用端口的 PID
-netstat -ano | findstr ":3000 :3001 :8000" | findstr LISTENING
+netstat -ano | findstr ":3000  :8000" | findstr LISTENING
 
 # 2. 杀掉进程（替换为实际 PID）
 taskkill //F //PID <frontend_pid>
 taskkill //F //PID <backend_pid>
 
 # 3. 启动后端（后台运行）
-cd D:/ai/family_life_hub/backend && venv/Scripts/python.exe main.py &
+cd D:/ai/family_life_hub/backend && venv/Scripts/python.exe main.py
 
 # 4. 启动前端（后台运行）
 cd D:/ai/family_life_hub/frontend && npm run dev &
@@ -78,4 +75,3 @@ cd D:/ai/family_life_hub/frontend && npm run dev &
 |------|------|-----|
 | 后端 API | 8000 | http://localhost:8000 |
 | 前端 | 3000 | http://localhost:3000 |
-| 前端备用 | 3001 | http://localhost:3001 |

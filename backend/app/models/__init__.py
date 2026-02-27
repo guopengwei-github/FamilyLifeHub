@@ -4,7 +4,7 @@ All timestamps are stored in UTC.
 """
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Date, Text, Index
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.database import Base
 
 
@@ -20,7 +20,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Integer, default=1, nullable=False)  # Boolean as integer for SQLite
     avatar = Column(String(255), nullable=True)  # URL or path to avatar image
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     health_metrics = relationship("HealthMetric", back_populates="user", cascade="all, delete-orphan")
@@ -52,8 +52,8 @@ class UserPreference(Base):
     default_view_tab = Column(String(50), default='activity', nullable=False)  # 默认Tab: activity/health
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="user_preferences")
@@ -95,8 +95,8 @@ class HealthMetric(Base):
     hrv_weekly_avg = Column(Integer, nullable=True)  # 周平均HRV (ms)
     hrv_status = Column(String(50), nullable=True)  # HRV状态 (e.g., "balanced", "unbalanced")
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="health_metrics")
@@ -127,8 +127,8 @@ class GarminConnection(Base):
     garmin_display_name = Column(String(255), nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc), nullable=False)
     last_sync_at = Column(DateTime, nullable=True)
 
     # Connection status
@@ -170,7 +170,7 @@ class GarminActivity(Base):
     # Timestamps
     start_time = Column(DateTime, nullable=True)
     start_time_local = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     user = relationship("User")

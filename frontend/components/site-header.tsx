@@ -6,6 +6,7 @@ import { LogOut, User as UserIcon, Activity, Settings } from 'lucide-react';
 import { UserSelectDropdown } from '@/components/dashboard/user-select-dropdown';
 import { SwitchToMeButton } from '@/components/dashboard/switch-to-me-button';
 import { User } from '@/types/api';
+import { getAvatarUrl } from '@/lib/api';
 
 interface SiteHeaderProps {
   users?: User[];
@@ -78,7 +79,7 @@ export function SiteHeader({
               <div className="flex items-center gap-2">
                 {user.avatar ? (
                   <img
-                    src={user.avatar}
+                    src={getAvatarUrl(user.avatar)}
                     alt={user.name}
                     className="h-8 w-8 rounded-full object-cover"
                   />

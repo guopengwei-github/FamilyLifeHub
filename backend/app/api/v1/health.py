@@ -4,7 +4,7 @@ Allows authenticated users to manage their own health data.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import List, Optional
 from app.core.database import get_db
 from app.core.security import get_current_active_user
@@ -84,7 +84,7 @@ async def create_health_metric(
         # Update existing metric
         for key, value in metric_data.model_dump(exclude_unset=True).items():
             setattr(existing, key, value)
-        existing.updated_at = datetime.utcnow()
+        existing.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(existing)
         return existing
@@ -128,7 +128,7 @@ async def update_health_metric(
     for key, value in metric_data.model_dump(exclude_unset=True).items():
         setattr(metric, key, value)
 
-    metric.updated_at = datetime.utcnow()
+    metric.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(metric)
 
