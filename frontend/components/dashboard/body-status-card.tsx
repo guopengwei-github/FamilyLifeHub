@@ -2,12 +2,15 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CardVisibilityControl } from '@/components/dashboard/card-visibility-control';
+import { BodyStatusTimelineChart } from '@/components/dashboard/body-status-timeline-chart';
 import { OverviewMetric } from '@/types/api';
 import { Battery, Droplets, Wind, HeartPulse, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BodyStatusCardProps {
   metrics: OverviewMetric[];
+  userId?: number;
+  date?: string;
   hiddenCards?: Set<string>;
   onToggleCard?: (cardId: string, hidden: boolean) => void;
   className?: string;
@@ -40,6 +43,8 @@ function getRecoveryStatus(bodyBattery: number | null, stressLevel: number | nul
 
 export function BodyStatusCard({
   metrics,
+  userId,
+  date,
   hiddenCards = new Set(),
   onToggleCard,
   className = '',
@@ -148,6 +153,11 @@ export function BodyStatusCard({
             color="text-red-500"
           />
         </div>
+
+        {/* 时间线图表 */}
+        {userId && date && (
+          <BodyStatusTimelineChart userId={userId} date={date} />
+        )}
       </CardContent>
     </Card>
   );

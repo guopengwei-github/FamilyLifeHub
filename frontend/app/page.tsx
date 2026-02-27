@@ -287,6 +287,8 @@ export default function DashboardPage() {
                 {!hiddenCards.has(CARD_IDS.BODY_STATUS) && (
                   <BodyStatusCard
                     metrics={overview.metrics}
+                    userId={viewingUser?.id}
+                    date={format(selectedDate, 'yyyy-MM-dd')}
                     hiddenCards={hiddenCards}
                     onToggleCard={(cardId, hidden) => handleToggleCard(cardId as CardId, hidden)}
                   />
