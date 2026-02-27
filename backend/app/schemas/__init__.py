@@ -88,6 +88,9 @@ class HealthMetricBase(BaseModel):
     respiration_rate: Optional[float] = Field(None, ge=0, le=100, description="Respiration rate (breaths/min)")
     resting_hr: Optional[int] = Field(None, ge=30, le=200, description="Resting heart rate (BPM)")
     sleep_score: Optional[int] = Field(None, ge=0, le=100, description="Sleep quality score (0-100)")
+    hrv_last_night: Optional[int] = Field(None, ge=0, description="Last night HRV average (ms)")
+    hrv_weekly_avg: Optional[int] = Field(None, ge=0, description="Weekly average HRV (ms)")
+    hrv_status: Optional[str] = Field(None, max_length=50, description="HRV status (e.g., balanced, unbalanced)")
 
 
 class HealthMetricCreate(HealthMetricBase):
@@ -128,6 +131,9 @@ class DailyTrendData(BaseModel):
     respiration_rate: Optional[float] = None
     resting_hr: Optional[int] = None
     sleep_score: Optional[int] = None
+    hrv_last_night: Optional[int] = None
+    hrv_weekly_avg: Optional[int] = None
+    hrv_status: Optional[str] = None
 
 
 class TrendResponse(BaseModel):
@@ -156,6 +162,9 @@ class OverviewMetric(BaseModel):
     respiration_rate: Optional[float] = None
     resting_hr: Optional[int] = None
     sleep_score: Optional[int] = None
+    hrv_last_night: Optional[int] = None
+    hrv_weekly_avg: Optional[int] = None
+    hrv_status: Optional[str] = None
 
 
 class OverviewResponse(BaseModel):

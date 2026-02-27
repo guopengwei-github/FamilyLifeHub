@@ -129,6 +129,29 @@ All timestamps are stored in UTC.
 3. **Docker**: NOT used for active development unless explicitly requested
    - Docker is only used when deploying to production
 
+### Working with Git Worktrees
+
+This project uses git worktrees for parallel branch development. The main worktree is at `D:\ai\family_life_hub`, and additional worktrees (like `D:\ai\data_details`) share the same virtual environment to save space and avoid compatibility issues.
+
+**For non-main worktrees**, use the provided activation script:
+
+```bash
+# In the worktree directory (e.g., D:/ai/data_details/backend)
+activate_dev.bat
+```
+
+This script:
+- Activates the virtual environment from the main worktree (`D:\ai\family_life_hub\backend\venv`)
+- Sets `PYTHONPATH` to the current worktree's backend directory
+- Keeps the terminal open for development
+
+**Or manually set up**:
+```bash
+call D:\ai\family_life_hub\backend\venv\Scripts\activate.bat
+set PYTHONPATH=D:\ai\data_details\backend
+python main.py
+```
+
 ## Configuration
 
 ### Backend Environment Variables

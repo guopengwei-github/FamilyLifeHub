@@ -52,6 +52,9 @@ export interface HealthMetric {
   respiration_rate?: number | null;
   resting_hr?: number | null;
   sleep_score?: number | null;
+  hrv_last_night?: number | null;
+  hrv_weekly_avg?: number | null;
+  hrv_status?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +76,9 @@ export interface HealthMetricForm {
   respiration_rate?: number;
   resting_hr?: number;
   sleep_score?: number;
+  hrv_last_night?: number;
+  hrv_weekly_avg?: number;
+  hrv_status?: string;
 }
 
 // ============ Dashboard Types ============
@@ -95,6 +101,9 @@ export interface OverviewMetric {
   respiration_rate: number | null;
   resting_hr: number | null;
   sleep_score: number | null;
+  hrv_last_night: number | null;
+  hrv_weekly_avg: number | null;
+  hrv_status: string | null;
 }
 
 export interface OverviewResponse {
@@ -121,6 +130,9 @@ export interface DailyTrendData {
   respiration_rate: number | null;
   resting_hr: number | null;
   sleep_score: number | null;
+  hrv_last_night: number | null;
+  hrv_weekly_avg: number | null;
+  hrv_status: string | null;
 }
 
 export interface TrendResponse {

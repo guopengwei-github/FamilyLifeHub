@@ -4,7 +4,8 @@ import garth
 from garth.http import Client
 from garth.sso import login as garth_login, resume_login
 from garth.exc import GarthHTTPError, GarthException
-from garth.stats import DailySteps, DailyIntensityMinutes
+from garth.stats import DailySteps, DailyIntensityMinutes, DailyHRV, DailyStress
+from garth import DailyBodyBatteryStress
 from datetime import datetime, timedelta, date
 from typing import Dict, List, Optional, Any, Tuple
 import logging
@@ -500,6 +501,123 @@ def fetch_daily_intensity(client: Client, target_date: date) -> Optional[Dict[st
         return None
 
 
+def fetch_daily_body_battery(client: Client, target_date: date) -> Optional[Dict[str, Any]]:
+    """
+    Fetch daily body battery data from Garmin using garth Stats API.
+
+    Args:
+        client: Authenticated garth Client
+        target_date: Date to fetch body battery data for
+
+    Returns:
+        Dictionary with current_body_battery, min, max values or None
+    """
+    try:
+        bb_data = DailyBodyBatteryStress.list(end=target_date, days=1, client=client)
+        logger.debug(f"DailyBodyBatteryStress.list() returned {len(bb_data)} items for {target_date}")
+        if bb_data:
+            data = bb_data[0]
+            result = {
+                'current_body_battery': data.current_body_battery,
+                'min_body_battery': data.min_body_battery,
+                'max_body_battery': data.max_body_battery,
+            }
+            logger.debug(f"Body battery for {target_date}: current={data.current_body_battery}")
+            return result
+        return None
+    except Exception as e:
+        logger.warning(f"Error fetching daily body battery for {target_date}: {e}")
+        logger.debug(traceback.format_exc())
+        return None
+
+
+def fetch_daily_stress(client: Client, target_date: date) -> Optional[Dict[str, Any]]:
+    """
+    Fetch daily stress level data from Garmin using garth Stats API.
+
+    Args:
+        client: Authenticated garth Client
+        target_date: Date to fetch stress data for
+
+    Returns:
+        Dictionary with overall_stress_level or None
+    """
+    try:
+        stress_data = DailyStress.list(period=1, client=client)
+        logger.debug(f"DailyStress.list() returned {len(stress_data)} items for {target_date}")
+        if stress_data:
+            data = stress_data[0]
+            result = {
+                'overall_stress_level': data.overall_stress_level,
+            }
+            logger.debug(f"Stress for {target_date}: overall={data.overall_stress_level}")
+            return result
+        return None
+    except Exception as e:
+        logger.warning(f"Error fetching daily stress for {target_date}: {e}")
+        logger.debug(traceback.format_exc())
+        return None
+
+
+def fetch_daily_steps(client: Client, target_date: date) -> Optional[Dict[str, Any]]:
+    """
+    Fetch daily steps data from Garmin using garth Stats API.
+
+    Args:
+        client: Authenticated garth Client
+        target_date: Date to fetch steps data for
+
+    Returns:
+        Dictionary with total_steps, total_distance or None
+    """
+    try:
+        steps_data = DailySteps.list(period=1, client=client)
+        logger.debug(f"DailySteps.list(period=1) returned {len(steps_data)} items")
+        if steps_data:
+            data = steps_data[0]
+            result = {
+                'total_steps': data.total_steps,
+                'total_distance': data.total_distance,
+            }
+            logger.debug(f"Steps for {target_date}: steps={data.total_steps}, distance={data.total_distance}m")
+            return result
+        return None
+    except Exception as e:
+        logger.warning(f"Error fetching daily steps for {target_date}: {e}")
+        logger.debug(traceback.format_exc())
+        return None
+
+
+def fetch_daily_hrv(client: Client, target_date: date) -> Optional[Dict[str, Any]]:
+    """
+    Fetch daily HRV (Heart Rate Variability) data from Garmin using garth Stats API.
+
+    Args:
+        client: Authenticated garth Client
+        target_date: Date to fetch HRV data for
+
+    Returns:
+        Dictionary with last_night_avg, weekly_avg, status or None
+    """
+    try:
+        hrv_data = DailyHRV.list(period=1, client=client)
+        logger.debug(f"DailyHRV.list(period=1) returned {len(hrv_data)} items")
+        if hrv_data:
+            data = hrv_data[0]
+            result = {
+                'last_night_avg': data.last_night_avg,
+                'weekly_avg': data.weekly_avg,
+                'status': data.status,
+            }
+            logger.debug(f"HRV for {target_date}: last_night={data.last_night_avg}, weekly={data.weekly_avg}, status={data.status}")
+            return result
+        return None
+    except Exception as e:
+        logger.warning(f"Error fetching daily HRV for {target_date}: {e}")
+        logger.debug(traceback.format_exc())
+        return None
+
+
 def fetch_daily_activities(client: Client, target_date: date) -> List[Dict[str, Any]]:
     """
     Fetch activities for a specific date from Garmin.
@@ -568,6 +686,10 @@ def map_garmin_to_health_metric(
     metric_date: date,
     wellness_data: Optional[Dict[str, Any]] = None,
     intensity_data: Optional[Dict[str, Any]] = None,
+    body_battery_data: Optional[Dict[str, Any]] = None,
+    stress_data: Optional[Dict[str, Any]] = None,
+    steps_data: Optional[Dict[str, Any]] = None,
+    hrv_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Map Garmin API data to HealthMetric fields.
@@ -578,6 +700,10 @@ def map_garmin_to_health_metric(
         metric_date: Date for the metric
         wellness_data: Optional daily wellness data (steps, distance)
         intensity_data: Optional intensity data (exercise minutes)
+        body_battery_data: Optional body battery data (current, min, max)
+        stress_data: Optional daily stress data (overall_stress_level)
+        steps_data: Optional daily steps data (total_steps, total_distance)
+        hrv_data: Optional daily HRV data (last_night_avg, weekly_avg, status)
 
     Returns:
         Dictionary with HealthMetric fields
@@ -600,6 +726,9 @@ def map_garmin_to_health_metric(
         'respiration_rate': None,
         'resting_hr': None,
         'sleep_score': None,
+        'hrv_last_night': None,
+        'hrv_weekly_avg': None,
+        'hrv_status': None,
     }
 
     # Extract data from dailySleepDTO structure
@@ -634,32 +763,43 @@ def map_garmin_to_health_metric(
         if stress_values:
             metric['stress_level'] = _safe_int(sum(stress_values) / len(stress_values))
 
-    # Extract body battery
-    if 'sleepBodyBattery' in garmin_data and garmin_data['sleepBodyBattery']:
+    # Extract body battery - prefer real-time data over sleep data
+    if body_battery_data and body_battery_data.get('current_body_battery') is not None:
+        metric['body_battery'] = _safe_int(body_battery_data['current_body_battery'])
+        logger.debug(f"    Using real-time body_battery: {metric['body_battery']}")
+    elif 'sleepBodyBattery' in garmin_data and garmin_data['sleepBodyBattery']:
         bb_values = [b.get('value') for b in garmin_data['sleepBodyBattery'] if b.get('value') is not None]
         if bb_values:
             metric['body_battery'] = _safe_int(bb_values[-1])
+            logger.debug(f"    Using sleep body_battery (fallback): {metric['body_battery']}")
 
     # Extract SpO2 (case-insensitive key lookup)
     spo2_key = next((k for k in garmin_data.keys() if 'spo2sleepsummarydto' in k.lower()), None)
     if spo2_key:
         spo2_data = garmin_data[spo2_key]
-        # Case-insensitive check for avgSpO2 key
-        avg_spo2_key = next((k for k in spo2_data.keys() if k.lower() == 'avgspo2'), None)
+        # Case-insensitive check for avgSpO2 key - try both 'averageSpO2' and 'avgSpO2'
+        avg_spo2_key = next((k for k in spo2_data.keys() if k.lower() in ('avgspo2', 'averagespo2')), None)
         if avg_spo2_key:
             metric['spo2'] = _safe_float(spo2_data[avg_spo2_key])
             logger.debug(f"    Mapping SpO2: {spo2_data[avg_spo2_key]}% -> {metric['spo2']}")
 
     # Extract respiration (case-insensitive key lookup)
-    respiration_key = next((k for k in garmin_data.keys() if 'respirationaverageslist' in k.lower()), None)
+    # Try both 'wellnessEpochRespirationDataDTOList' and 'respirationAveragesList'
+    respiration_key = next((k for k in garmin_data.keys() if 'respiration' in k.lower() and ('dto' in k.lower() or 'list' in k.lower() or 'average' in k.lower())), None)
     if respiration_key:
         resp_list = garmin_data[respiration_key]
-        # Case-insensitive check for breathsPerMinute key
+        # Check for respirationValue key (new API) or breathsPerMinute key (old API)
         resp_values = []
         for r in resp_list:
-            bpm_key = next((k for k in r.keys() if k.lower() == 'breathsperminute'), None)
-            if bpm_key and r[bpm_key] is not None:
-                resp_values.append(r[bpm_key])
+            # Try 'respirationValue' first (new Garmin API format)
+            if 'respirationValue' in r:
+                if r['respirationValue'] is not None:
+                    resp_values.append(r['respirationValue'])
+            else:
+                # Fallback to old 'breathsPerMinute' format
+                bpm_key = next((k for k in r.keys() if k.lower() == 'breathsperminute'), None)
+                if bpm_key and r[bpm_key] is not None:
+                    resp_values.append(r[bpm_key])
         if resp_values:
             metric['respiration_rate'] = _safe_float(sum(resp_values) / len(resp_values))
             logger.debug(f"    Mapping respiration_rate: {metric['respiration_rate']} bpm (from {len(resp_values)} readings)")
@@ -680,6 +820,28 @@ def map_garmin_to_health_metric(
     if intensity_data and 'total_minutes' in intensity_data:
         metric['exercise_minutes'] = _safe_int(intensity_data['total_minutes'])
         logger.debug(f"    Mapping exercise_minutes: {intensity_data['total_minutes']} -> {metric['exercise_minutes']}")
+
+    # Extract stress level from daily stress data - prefer real-time data over sleep stress
+    if stress_data and stress_data.get('overall_stress_level') is not None:
+        metric['stress_level'] = _safe_int(stress_data['overall_stress_level'])
+        logger.debug(f"    Using real-time stress_level: {metric['stress_level']}")
+
+    # Extract steps from daily steps data - prefer real-time data over wellness data
+    if steps_data and steps_data.get('total_steps') is not None:
+        metric['steps'] = _safe_int(steps_data['total_steps'])
+        logger.debug(f"    Using real-time steps: {metric['steps']}")
+
+    # Extract HRV data
+    if hrv_data:
+        if hrv_data.get('last_night_avg') is not None:
+            metric['hrv_last_night'] = _safe_int(hrv_data['last_night_avg'])
+            logger.debug(f"    Mapping hrv_last_night: {hrv_data['last_night_avg']} -> {metric['hrv_last_night']}")
+        if hrv_data.get('weekly_avg') is not None:
+            metric['hrv_weekly_avg'] = _safe_int(hrv_data['weekly_avg'])
+            logger.debug(f"    Mapping hrv_weekly_avg: {hrv_data['weekly_avg']} -> {metric['hrv_weekly_avg']}")
+        if hrv_data.get('status') is not None:
+            metric['hrv_status'] = hrv_data['status']
+            logger.debug(f"    Mapping hrv_status: {hrv_data['status']} -> {metric['hrv_status']}")
 
     return metric
 
@@ -933,6 +1095,10 @@ def refresh_garmin_data(
                 daily_summary = fetch_daily_summary(client, current_date)
                 daily_wellness = fetch_daily_wellness(client, current_date)
                 daily_intensity = fetch_daily_intensity(client, current_date)
+                daily_body_battery = fetch_daily_body_battery(client, current_date)
+                daily_stress = fetch_daily_stress(client, current_date)
+                daily_steps = fetch_daily_steps(client, current_date)
+                daily_hrv = fetch_daily_hrv(client, current_date)
 
                 if not daily_summary:
                     logger.warning(f"No daily_summary data for {current_date}, skipping")
@@ -940,7 +1106,8 @@ def refresh_garmin_data(
                     continue
 
                 metric_data = map_garmin_to_health_metric(
-                    user_id, daily_summary, current_date, daily_wellness, daily_intensity
+                    user_id, daily_summary, current_date, daily_wellness, daily_intensity, daily_body_battery,
+                    daily_stress, daily_steps, daily_hrv
                 )
 
                 # Check if we have any data worth saving
