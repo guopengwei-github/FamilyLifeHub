@@ -14,7 +14,7 @@ import pickle
 import traceback
 
 from app.core.security import encrypt_token, decrypt_token
-from app.models import User, GarminConnection, HealthMetric, GarminActivity
+from app.models import User, GarminConnection, HealthMetric, GarminActivity, BodyStatusTimeseries
 from app.core.database import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -744,6 +744,77 @@ def save_garmin_activities(
     return count
 
 
+def save_body_status_timeseries(
+    user_id: int,
+    garmin_data: Dict[str, Any],
+    target_date: date,
+    db_session
+) -> int:
+    """
+    Save body status timeseries data (body battery, stress, heart rate) to database.
+
+    Args:
+        user_id: User ID
+        garmin_data: Raw Garmin daily summary data containing sleepBodyBattery and sleepStress arrays
+        target_date: Date of the data
+        db_session: Database session
+
+    Returns:
+        Number of timeseries records saved
+    """
+    count = 0
+    timestamps_seen = set()
+
+    # Delete existing timeseries data for this user and date
+    start_dt = datetime.combine(target_date, datetime.min.time())
+    end_dt = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+    db_session.query(BodyStatusTimeseries).filter(
+        BodyStatusTimeseries.user_id == user_id,
+        BodyStatusTimeseries.timestamp >= start_dt,
+        BodyStatusTimeseries.timestamp < end_dt
+    ).delete()
+
+    # Collect all data points by timestamp
+    data_by_timestamp: Dict[datetime, Dict[str, Any]] = {}
+
+    # Process sleepBodyBattery array
+    if 'sleepBodyBattery' in garmin_data and garmin_data['sleepBodyBattery']:
+        for item in garmin_data['sleepBodyBattery']:
+            ts_millis = item.get('startTimestampGMT')
+            value = item.get('value')
+            if ts_millis is not None and value is not None:
+                ts = datetime.utcfromtimestamp(ts_millis / 1000)
+                if ts not in data_by_timestamp:
+                    data_by_timestamp[ts] = {}
+                data_by_timestamp[ts]['body_battery'] = _safe_int(value)
+
+    # Process sleepStress array
+    if 'sleepStress' in garmin_data and garmin_data['sleepStress']:
+        for item in garmin_data['sleepStress']:
+            ts_millis = item.get('startTimestampGMT')
+            value = item.get('value')
+            if ts_millis is not None and value is not None:
+                ts = datetime.utcfromtimestamp(ts_millis / 1000)
+                if ts not in data_by_timestamp:
+                    data_by_timestamp[ts] = {}
+                data_by_timestamp[ts]['stress_level'] = _safe_int(value)
+
+    # Create records for each timestamp
+    for ts, values in data_by_timestamp.items():
+        record = BodyStatusTimeseries(
+            user_id=user_id,
+            timestamp=ts,
+            body_battery=values.get('body_battery'),
+            stress_level=values.get('stress_level'),
+            heart_rate=values.get('heart_rate')
+        )
+        db_session.add(record)
+        count += 1
+
+    logger.debug(f"Saved {count} body status timeseries records for {target_date}")
+    return count
+
+
 def refresh_garmin_data(
     user_id: int,
     days: int = 7,
@@ -900,6 +971,10 @@ def refresh_garmin_data(
                         sync_results['metrics_created'] += 1
 
                     sync_results['days_synced'] += 1
+
+                # Save body status timeseries data (regardless of has_data)
+                if daily_summary:
+                    save_body_status_timeseries(user_id, daily_summary, current_date, db)
 
             except Exception as e:
                 logger.error(f"Error processing data for {current_date}: {e}")

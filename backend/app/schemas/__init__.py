@@ -291,3 +291,20 @@ class GarminActivitiesResponse(BaseModel):
     """Response schema for Garmin activities list."""
     activities: List[GarminActivityResponse]
     count: int
+
+
+# ============ Body Status Timeseries Schemas ============
+
+class BodyStatusTimeseriesPoint(BaseModel):
+    """Single data point in body status timeseries."""
+    timestamp: datetime
+    body_battery: Optional[int] = None
+    stress_level: Optional[int] = None
+    heart_rate: Optional[int] = None
+
+
+class BodyStatusTimeseriesResponse(BaseModel):
+    """Response schema for body status timeseries endpoint."""
+    user_id: int
+    date: date_type
+    data: List[BodyStatusTimeseriesPoint]

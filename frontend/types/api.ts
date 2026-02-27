@@ -252,3 +252,18 @@ export const CARD_IDS = {
 } as const;
 
 export type CardId = typeof CARD_IDS[keyof typeof CARD_IDS];
+
+// ============ Body Status Timeseries Types ============
+
+export interface BodyStatusTimeseriesPoint {
+  timestamp: string;
+  body_battery: number | null;
+  stress_level: number | null;
+  heart_rate: number | null;
+}
+
+export interface BodyStatusTimeseriesResponse {
+  user_id: number;
+  date: string;
+  data: BodyStatusTimeseriesPoint[];
+}

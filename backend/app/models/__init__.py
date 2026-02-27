@@ -2,7 +2,7 @@
 SQLAlchemy database models for FamilyLifeHub.
 All timestamps are stored in UTC.
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Date, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Date, Text, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
@@ -174,3 +174,30 @@ class GarminActivity(Base):
 
     def __repr__(self):
         return f"<GarminActivity(user_id={self.user_id}, type={self.activity_type}, date={self.date})>"
+
+
+class BodyStatusTimeseries(Base):
+    """
+    Time-series body status data from Garmin.
+    Stores minute-level body battery, stress, and heart rate readings.
+    """
+    __tablename__ = "body_status_timeseries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    timestamp = Column(DateTime, nullable=False, index=True)
+
+    # Body status metrics
+    body_battery = Column(Integer, nullable=True)  # 0-100
+    stress_level = Column(Integer, nullable=True)  # 0-100
+    heart_rate = Column(Integer, nullable=True)    # BPM
+
+    __table_args__ = (
+        Index('ix_body_status_user_timestamp', 'user_id', 'timestamp'),
+    )
+
+    # Relationships
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"<BodyStatusTimeseries(user_id={self.user_id}, timestamp={self.timestamp})>"

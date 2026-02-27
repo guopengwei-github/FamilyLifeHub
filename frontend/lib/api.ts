@@ -17,6 +17,7 @@ import {
   UserPreference,
   type UserPreferenceUpdate as UserPreferenceUpdateType,
   type SummaryResponse,
+  type BodyStatusTimeseriesResponse,
 } from '@/types/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -455,4 +456,18 @@ export async function updateHiddenCards(hiddenCards: string): Promise<{ message:
     method: 'PUT',
     body: JSON.stringify({ hidden_cards: hiddenCards }),
   });
+}
+
+// ============ Timeseries Endpoints ============
+
+/**
+ * Get body status timeseries data for a specific date
+ */
+export async function getBodyStatusTimeseries(
+  userId: number,
+  date: string
+): Promise<BodyStatusTimeseriesResponse> {
+  return fetchAPI<BodyStatusTimeseriesResponse>(
+    `/api/v1/timeseries/body-status?user_id=${userId}&target_date=${date}`
+  );
 }
