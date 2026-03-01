@@ -18,6 +18,11 @@ import {
   type UserPreferenceUpdate as UserPreferenceUpdateType,
   type SummaryResponse,
   type BodyStatusTimeseriesResponse,
+  type HealthReport,
+  type HealthReportListResponse,
+  type HealthReportRegenerateRequest,
+  type UserProfile,
+  type UserProfileUpdate,
 } from '@/types/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -479,4 +484,71 @@ export async function getBodyStatusTimeseries(
   return fetchAPI<BodyStatusTimeseriesResponse>(
     `/api/v1/timeseries/body-status?user_id=${userId}&target_date=${date}`
   );
+}
+
+// ============ Health Report Endpoints ============
+
+/**
+ * Get morning report for a specific date
+ */
+export async function getMorningReport(reportDate?: string): Promise<HealthReport> {
+  const params = reportDate ? `?report_date=${reportDate}` : '';
+  return fetchAPI<HealthReport>(`/api/v1/reports/morning${params}`);
+}
+
+/**
+ * Get evening report for a specific date
+ */
+export async function getEveningReport(reportDate?: string): Promise<HealthReport> {
+  const params = reportDate ? `?report_date=${reportDate}` : '';
+  return fetchAPI<HealthReport>(`/api/v1/reports/evening${params}`);
+}
+
+/**
+ * Get report history
+ */
+export async function getReportHistory(
+  reportType?: 'morning' | 'evening',
+  limit: number = 10
+): Promise<HealthReportListResponse> {
+  const params = new URLSearchParams();
+  params.append('limit', limit.toString());
+  if (reportType) {
+    params.append('report_type', reportType);
+  }
+  return fetchAPI<HealthReportListResponse>(`/api/v1/reports/history?${params}`);
+}
+
+/**
+ * Regenerate a health report
+ */
+export async function regenerateReport(
+  reportType: 'morning' | 'evening',
+  reportDate?: string
+): Promise<HealthReport> {
+  const body: HealthReportRegenerateRequest = { report_type: reportType };
+  if (reportDate) {
+    body.report_date = reportDate;
+  }
+  return fetchAPI<HealthReport>('/api/v1/reports/regenerate', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Get user profile for reports
+ */
+export async function getReportProfile(): Promise<UserProfile> {
+  return fetchAPI<UserProfile>('/api/v1/reports/profile');
+}
+
+/**
+ * Update user profile for reports
+ */
+export async function updateReportProfile(data: UserProfileUpdate): Promise<UserProfile> {
+  return fetchAPI<UserProfile>('/api/v1/reports/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
 }

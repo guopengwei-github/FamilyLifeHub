@@ -280,3 +280,37 @@ export interface BodyStatusTimeseriesResponse {
   requested_date: string | null;
   data: BodyStatusTimeseriesPoint[];
 }
+
+// ============ Health Report Types ============
+
+export interface HealthReport {
+  id: number;
+  user_id: number;
+  report_date: string;
+  report_type: 'morning' | 'evening';
+  content: string;
+  generated_at: string;
+  llm_model: string | null;
+}
+
+export interface HealthReportListResponse {
+  reports: HealthReport[];
+  count: number;
+}
+
+export interface HealthReportRegenerateRequest {
+  report_type: 'morning' | 'evening';
+  report_date?: string;
+}
+
+export interface UserProfile {
+  age: number | null;
+  gender: string | null;
+  weight_kg: number | null;
+}
+
+export interface UserProfileUpdate {
+  age?: number;
+  gender?: 'male' | 'female' | 'other';
+  weight_kg?: number;
+}

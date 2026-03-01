@@ -35,7 +35,8 @@ import { FamilyMemberStrip } from '@/components/dashboard/family-member-strip';
 import { MemberDetailPanel } from '@/components/dashboard/member-detail-panel';
 import { CardSettingsPanel } from '@/components/dashboard/card-settings-panel';
 import { DateNavigator } from '@/components/dashboard/date-navigator';
-import { format } from 'date-fns';
+import { MorningReport, EveningReport } from '@/components/reports';
+import { format, isToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 // Garmin sync status types
@@ -336,6 +337,14 @@ export default function DashboardPage() {
           {/* Main Content */}
           {!loading && !error && summary && overview && (
             <div className="space-y-8">
+              {/* Health Reports - Only show for today */}
+              {isToday(selectedDate) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <MorningReport date={format(selectedDate, 'yyyy-MM-dd')} />
+                  <EveningReport date={format(selectedDate, 'yyyy-MM-dd')} />
+                </div>
+              )}
+
               {/* User Summary Card */}
               <UserSummaryCard
                 summary={summary}
