@@ -277,5 +277,6 @@ export interface BodyStatusTimeseriesPoint {
 export interface BodyStatusTimeseriesResponse {
   user_id: number;
   date: string;
+  requested_date: string | null;
   data: BodyStatusTimeseriesPoint[];
 }

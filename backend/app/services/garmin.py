@@ -559,6 +559,62 @@ def fetch_daily_stress(client: Client, target_date: date) -> Optional[Dict[str, 
         return None
 
 
+def fetch_body_battery_events(client: Client, target_date: date) -> Optional[Dict[str, Any]]:
+    """
+    Fetch full 24-hour body battery and stress data from Garmin.
+
+    Uses DailyBodyBatteryStress API which provides continuous readings
+    throughout the entire day (typically 480 readings at 3-minute intervals).
+
+    Args:
+        client: Authenticated garth Client
+        target_date: Date to fetch body battery data for
+
+    Returns:
+        Dictionary with body_battery_readings and stress_readings lists, or None
+    """
+    try:
+        data = DailyBodyBatteryStress.get(target_date, client=client)
+        if not data:
+            logger.warning(f"DailyBodyBatteryStress.get() returned None for {target_date}")
+            return None
+
+        result = {
+            'body_battery_readings': [],
+            'stress_readings': [],
+        }
+
+        # Process body battery values array: [timestamp, status, level, version]
+        if data.body_battery_values_array:
+            for values in data.body_battery_values_array:
+                if len(values) >= 3:
+                    result['body_battery_readings'].append({
+                        'timestamp': values[0],
+                        'status': values[1],
+                        'level': values[2],
+                    })
+            logger.debug(f"Extracted {len(result['body_battery_readings'])} body battery readings")
+
+        # Process stress values array: [timestamp, stress_level]
+        if data.stress_values_array:
+            for values in data.stress_values_array:
+                if len(values) >= 2:
+                    result['stress_readings'].append({
+                        'timestamp': values[0],
+                        'stress_level': values[1],
+                    })
+            logger.debug(f"Extracted {len(result['stress_readings'])} stress readings")
+
+        logger.info(f"Fetched {len(result['body_battery_readings'])} body battery and "
+                    f"{len(result['stress_readings'])} stress readings for {target_date}")
+        return result
+
+    except Exception as e:
+        logger.warning(f"Error fetching body battery data for {target_date}: {e}")
+        logger.debug(traceback.format_exc())
+        return None
+
+
 def fetch_daily_steps(client: Client, target_date: date) -> Optional[Dict[str, Any]]:
     """
     Fetch daily steps data from Garmin using garth Stats API.
@@ -910,26 +966,34 @@ def save_body_status_timeseries(
     user_id: int,
     garmin_data: Dict[str, Any],
     target_date: date,
-    db_session
+    db_session,
+    body_battery_events: Optional[Dict[str, Any]] = None
 ) -> int:
     """
     Save body status timeseries data (body battery, stress, heart rate) to database.
+
+    Combines sleep data from daily summary with full 24-hour body battery data from
+    DailyBodyBatteryStress API (typically 480 readings at 3-minute intervals).
 
     Args:
         user_id: User ID
         garmin_data: Raw Garmin daily summary data containing sleepBodyBattery and sleepStress arrays
         target_date: Date of the data
         db_session: Database session
+        body_battery_events: Optional dict with 'body_battery_readings' and 'stress_readings' lists
 
     Returns:
         Number of timeseries records saved
     """
     count = 0
-    timestamps_seen = set()
 
     # Delete existing timeseries data for this user and date
-    start_dt = datetime.combine(target_date, datetime.min.time())
-    end_dt = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+    # Convert local date to UTC range to match how data is saved (UTC naive datetime)
+    local_tz_offset = datetime.now().astimezone().utcoffset() or timedelta(0)
+    local_start = datetime.combine(target_date, datetime.min.time())
+    local_end = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+    start_dt = local_start - local_tz_offset
+    end_dt = local_end - local_tz_offset
     db_session.query(BodyStatusTimeseries).filter(
         BodyStatusTimeseries.user_id == user_id,
         BodyStatusTimeseries.timestamp >= start_dt,
@@ -939,27 +1003,53 @@ def save_body_status_timeseries(
     # Collect all data points by timestamp
     data_by_timestamp: Dict[datetime, Dict[str, Any]] = {}
 
-    # Process sleepBodyBattery array
+    # Process body battery events (full 24-hour data) if available
+    # body_battery_events is now a dict with 'body_battery_readings' and 'stress_readings' lists
+    if body_battery_events:
+        # Process body battery readings
+        for reading in body_battery_events.get('body_battery_readings', []):
+            ts_millis = reading.get('timestamp')
+            level = reading.get('level')
+            if ts_millis is not None and level is not None:
+                ts = datetime.utcfromtimestamp(ts_millis / 1000)
+                if ts not in data_by_timestamp:
+                    data_by_timestamp[ts] = {}
+                data_by_timestamp[ts]['body_battery'] = _safe_int(level)
+
+        # Process stress readings
+        for reading in body_battery_events.get('stress_readings', []):
+            ts_millis = reading.get('timestamp')
+            stress = reading.get('stress_level')
+            if ts_millis is not None and stress is not None:
+                ts = datetime.utcfromtimestamp(ts_millis / 1000)
+                if ts not in data_by_timestamp:
+                    data_by_timestamp[ts] = {}
+                data_by_timestamp[ts]['stress_level'] = _safe_int(stress)
+
+    # Fall back to sleep-only data if no events data or to fill gaps
     if 'sleepBodyBattery' in garmin_data and garmin_data['sleepBodyBattery']:
         for item in garmin_data['sleepBodyBattery']:
-            ts_millis = item.get('startTimestampGMT')
+            ts_millis = item.get('startGMT')
             value = item.get('value')
             if ts_millis is not None and value is not None:
                 ts = datetime.utcfromtimestamp(ts_millis / 1000)
                 if ts not in data_by_timestamp:
                     data_by_timestamp[ts] = {}
-                data_by_timestamp[ts]['body_battery'] = _safe_int(value)
+                # Only set if not already set from events data
+                if 'body_battery' not in data_by_timestamp[ts]:
+                    data_by_timestamp[ts]['body_battery'] = _safe_int(value)
 
-    # Process sleepStress array
     if 'sleepStress' in garmin_data and garmin_data['sleepStress']:
         for item in garmin_data['sleepStress']:
-            ts_millis = item.get('startTimestampGMT')
+            ts_millis = item.get('startGMT')
             value = item.get('value')
             if ts_millis is not None and value is not None:
                 ts = datetime.utcfromtimestamp(ts_millis / 1000)
                 if ts not in data_by_timestamp:
                     data_by_timestamp[ts] = {}
-                data_by_timestamp[ts]['stress_level'] = _safe_int(value)
+                # Only set if not already set from events data
+                if 'stress_level' not in data_by_timestamp[ts]:
+                    data_by_timestamp[ts]['stress_level'] = _safe_int(value)
 
     # Create records for each timestamp
     for ts, values in data_by_timestamp.items():
@@ -1099,6 +1189,7 @@ def refresh_garmin_data(
                 daily_stress = fetch_daily_stress(client, current_date)
                 daily_steps = fetch_daily_steps(client, current_date)
                 daily_hrv = fetch_daily_hrv(client, current_date)
+                body_battery_events = fetch_body_battery_events(client, current_date)
 
                 if not daily_summary:
                     logger.warning(f"No daily_summary data for {current_date}, skipping")
@@ -1141,7 +1232,7 @@ def refresh_garmin_data(
 
                 # Save body status timeseries data (regardless of has_data)
                 if daily_summary:
-                    save_body_status_timeseries(user_id, daily_summary, current_date, db)
+                    save_body_status_timeseries(user_id, daily_summary, current_date, db, body_battery_events)
 
             except Exception as e:
                 logger.error(f"Error processing data for {current_date}: {e}")

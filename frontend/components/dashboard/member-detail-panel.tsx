@@ -138,6 +138,8 @@ export function MemberDetailPanel({
             {/* Body Status Card */}
             <BodyStatusCard
               metrics={userMetrics}
+              userId={user.id}
+              date={format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')}
               hiddenCards={hiddenCards}
               onToggleCard={handleToggleCard}
             />

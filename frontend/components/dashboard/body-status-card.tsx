@@ -156,7 +156,7 @@ export function BodyStatusCard({
 
         {/* 时间线图表 */}
         {userId && date && (
-          <BodyStatusTimelineChart userId={userId} date={date} />
+          <BodyStatusTimelineChart userId={userId} date={date} requestedDate={date} />
         )}
       </CardContent>
     </Card>

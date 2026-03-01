@@ -1,8 +1,8 @@
 """
 Pydantic schemas for request validation and response serialization.
 """
-from pydantic import BaseModel, Field, field_validator
-from datetime import datetime
+from pydantic import BaseModel, Field, field_serializer, field_validator
+from datetime import datetime, timezone
 from datetime import date as date_type
 from typing import Optional, List
 
@@ -199,6 +199,16 @@ class GarminConnectionResponse(BaseModel):
     last_sync_at: Optional[datetime] = Field(None, description="Last successful sync timestamp")
     sync_status: str = Field(..., description="Connection status: connected/error/expired")
 
+    @field_serializer('created_at', 'last_sync_at')
+    def serialize_datetime(self, dt: Optional[datetime]) -> Optional[str]:
+        """Serialize datetime as ISO 8601 with UTC timezone."""
+        if dt is None:
+            return None
+        # SQLite returns naive datetime (no timezone), treat it as UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
 
 class GarminSyncRequest(BaseModel):
     """Schema for triggering Garmin sync."""
@@ -215,6 +225,16 @@ class GarminSyncResponse(BaseModel):
     activities_created: int = Field(default=0, description="Number of activities created")
     errors: List[str] = Field(default_factory=list, description="Any errors during sync")
     last_sync_at: Optional[datetime] = Field(None, description="Timestamp of this sync")
+
+    @field_serializer('last_sync_at')
+    def serialize_datetime(self, dt: Optional[datetime]) -> Optional[str]:
+        """Serialize datetime as ISO 8601 with UTC timezone."""
+        if dt is None:
+            return None
+        # SQLite returns naive datetime (no timezone), treat it as UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
 
 
 # ============ User Preference Schemas ============
@@ -311,9 +331,17 @@ class BodyStatusTimeseriesPoint(BaseModel):
     stress_level: Optional[int] = None
     heart_rate: Optional[int] = None
 
+    @field_serializer('timestamp')
+    def serialize_timestamp(self, dt: datetime, _info) -> str:
+        """Ensure timestamp is serialized with UTC timezone suffix."""
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc).isoformat()
+        return dt.isoformat()
+
 
 class BodyStatusTimeseriesResponse(BaseModel):
     """Response schema for body status timeseries endpoint."""
     user_id: int
     date: date_type
+    requested_date: Optional[date_type] = None
     data: List[BodyStatusTimeseriesPoint]

@@ -21,6 +21,7 @@ import { BodyStatusTimeseriesPoint } from '@/types/api';
 interface BodyStatusTimelineChartProps {
   userId: number;
   date: string;
+  requestedDate: string;
 }
 
 interface ChartDataPoint {
@@ -29,8 +30,9 @@ interface ChartDataPoint {
   stress_level: number | null;
 }
 
-export function BodyStatusTimelineChart({ userId, date }: BodyStatusTimelineChartProps) {
+export function BodyStatusTimelineChart({ userId, date, requestedDate }: BodyStatusTimelineChartProps) {
   const [data, setData] = useState<ChartDataPoint[]>([]);
+  const [actualDataDate, setActualDataDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +42,7 @@ export function BodyStatusTimelineChart({ userId, date }: BodyStatusTimelineChar
       setError(null);
       try {
         const response = await getBodyStatusTimeseries(userId, date);
+        setActualDataDate(response.date);
         const chartData = response.data.map((point: BodyStatusTimeseriesPoint) => ({
           time: format(new Date(point.timestamp), 'HH:mm'),
           body_battery: point.body_battery,
@@ -82,7 +85,16 @@ export function BodyStatusTimelineChart({ userId, date }: BodyStatusTimelineChar
 
   return (
     <div className="pt-2">
-      <p className="text-sm text-muted-foreground mb-2">今日变化趋势</p>
+      {requestedDate !== actualDataDate && actualDataDate && (
+        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+          <span>睡眠数据尚未生成，显示</span>
+          <span className="font-semibold">{actualDataDate}</span>
+          <span>的数据</span>
+        </p>
+      )}
+      <p className="text-sm text-muted-foreground mb-2">
+        身体电量变化趋势（{data[0]?.time} → {data[data.length - 1]?.time}）
+      </p>
       <ResponsiveContainer width="100%" height={180}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" opacity={0.3} />

@@ -1,12 +1,13 @@
 # ABOUTME: Garmin Connect API endpoints for OAuth authentication and data sync
 # ABOUTME: Handles username/password login, MFA verification, connection status, and sync triggers
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional
 import secrets
 import base64
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user, check_rate_limit
@@ -120,12 +121,20 @@ async def verify_garmin_mfa(
             db_session=db
         )
 
+        # Ensure datetimes have UTC timezone (SQLite returns naive datetime)
+        created_at = connection.created_at
+        last_sync_at = connection.last_sync_at
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        if last_sync_at and last_sync_at.tzinfo is None:
+            last_sync_at = last_sync_at.replace(tzinfo=timezone.utc)
+
         return GarminConnectionResponse(
             connected=True,
             garmin_display_name=connection.garmin_display_name,
             garmin_user_id=connection.garmin_user_id,
-            created_at=connection.created_at,
-            last_sync_at=connection.last_sync_at,
+            created_at=created_at,
+            last_sync_at=last_sync_at,
             sync_status=connection.sync_status
         )
 
@@ -200,12 +209,20 @@ async def connect_garmin(
             db_session=db
         )
 
+        # Ensure datetimes have UTC timezone (SQLite returns naive datetime)
+        created_at = connection.created_at
+        last_sync_at = connection.last_sync_at
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        if last_sync_at and last_sync_at.tzinfo is None:
+            last_sync_at = last_sync_at.replace(tzinfo=timezone.utc)
+
         return GarminConnectionResponse(
             connected=True,
             garmin_display_name=connection.garmin_display_name,
             garmin_user_id=connection.garmin_user_id,
-            created_at=connection.created_at,
-            last_sync_at=connection.last_sync_at,
+            created_at=created_at,
+            last_sync_at=last_sync_at,
             sync_status=connection.sync_status
         )
 
@@ -254,7 +271,7 @@ async def connect_garmin(
         )
 
 
-@router.get("/connection", response_model=GarminConnectionResponse)
+@router.get("/connection")
 async def get_garmin_connection(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -272,7 +289,7 @@ async def get_garmin_connection(
     ).first()
 
     if not connection:
-        return GarminConnectionResponse(
+        response = GarminConnectionResponse(
             connected=False,
             garmin_display_name=None,
             garmin_user_id=None,
@@ -280,15 +297,33 @@ async def get_garmin_connection(
             last_sync_at=None,
             sync_status="not_connected"
         )
+        return JSONResponse(content=response.model_dump(mode='json'))
 
-    return GarminConnectionResponse(
-        connected=connection.sync_status == "connected",
-        garmin_display_name=connection.garmin_display_name,
-        garmin_user_id=connection.garmin_user_id,
-        created_at=connection.created_at,
-        last_sync_at=connection.last_sync_at,
-        sync_status=connection.sync_status
-    )
+    # Ensure datetimes have UTC timezone (SQLite returns naive datetime)
+    created_at = connection.created_at
+    last_sync_at = connection.last_sync_at
+    if created_at and created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    if last_sync_at and last_sync_at.tzinfo is None:
+        last_sync_at = last_sync_at.replace(tzinfo=timezone.utc)
+
+    # Manually construct response with proper datetime serialization
+    def serialize_datetime(dt: Optional[datetime]) -> Optional[str]:
+        """Serialize datetime as ISO 8601 with UTC timezone."""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+    return JSONResponse(content={
+        "connected": connection.sync_status == "connected",
+        "garmin_display_name": connection.garmin_display_name,
+        "garmin_user_id": connection.garmin_user_id,
+        "created_at": serialize_datetime(created_at),
+        "last_sync_at": serialize_datetime(last_sync_at),
+        "sync_status": connection.sync_status
+    })
 
 
 @router.delete("/connection")

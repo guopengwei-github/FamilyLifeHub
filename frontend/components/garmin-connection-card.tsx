@@ -552,7 +552,14 @@ export function GarminConnectionCard({ onSyncComplete }: GarminConnectionCardPro
                 </span>
                 <span className="font-medium">
                   {connection.last_sync_at
-                    ? new Date(connection.last_sync_at).toLocaleString()
+                    ? (() => {
+                        // Parse last_sync_at - if no timezone, treat as UTC (backend stores UTC)
+                        const lastSyncStr = connection.last_sync_at!;
+                        const lastSyncWithTz = lastSyncStr.includes('+') || lastSyncStr.includes('Z')
+                          ? lastSyncStr
+                          : lastSyncStr + '+00:00';
+                        return new Date(lastSyncWithTz).toLocaleString();
+                      })()
                     : (isCn ? '从未' : 'Never')}
                 </span>
               </div>

@@ -70,8 +70,12 @@ export default function DashboardPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<User | null>(null);
 
-  // Date navigation state
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  // Date navigation state - default to yesterday since Garmin sleep data has delay
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday;
+  });
 
   // Hidden cards state
   const [hiddenCards, setHiddenCards] = useState<Set<string>>(new Set());
@@ -99,8 +103,14 @@ export default function DashboardPage() {
       return { status: 'stale' };
     }
 
+    // Parse last_sync_at - if no timezone, treat as UTC (backend stores UTC)
+    const lastSyncStr = connection.last_sync_at;
+    const lastSyncWithTz = lastSyncStr.includes('+') || lastSyncStr.includes('Z')
+      ? lastSyncStr
+      : lastSyncStr + '+00:00';  // Add UTC timezone if missing
+
     const now = new Date();
-    const lastSync = new Date(connection.last_sync_at);
+    const lastSync = new Date(lastSyncWithTz);
     const hoursDiff = (now.getTime() - lastSync.getTime()) / (1000 * 60 * 60);
 
     if (hoursDiff < 24) {

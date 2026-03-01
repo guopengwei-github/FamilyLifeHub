@@ -22,21 +22,51 @@ async def get_body_status_timeseries(
 ):
     """
     Get body status timeseries data for a specific date.
-    Returns minute-level body battery, stress, and heart rate readings.
+
+    Note: Garmin sleep timeseries data is only available after the sleep
+    period completes. For dates >= today, we return the most recent
+    available data (typically yesterday's sleep data).
     """
     # Use current user if no user_id specified
     query_user_id = user_id if user_id is not None else current_user.id
 
-    # Calculate date range (start of day to end of day in UTC)
-    start_datetime = datetime.combine(target_date, datetime.min.time())
-    end_datetime = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+    query_date = target_date
+    local_tz_offset = datetime.now().astimezone().utcoffset() or timedelta(0)
 
-    # Query timeseries data
-    records = db.query(BodyStatusTimeseries).filter(
-        BodyStatusTimeseries.user_id == query_user_id,
-        BodyStatusTimeseries.timestamp >= start_datetime,
-        BodyStatusTimeseries.timestamp < end_datetime
-    ).order_by(BodyStatusTimeseries.timestamp).all()
+    # Helper function to query records for a specific date
+    def query_records_for_date(search_date: date):
+        local_start = datetime.combine(search_date, datetime.min.time())
+        local_end = datetime.combine(search_date + timedelta(days=1), datetime.min.time())
+        start_datetime = local_start - local_tz_offset
+        end_datetime = local_end - local_tz_offset
+        return db.query(BodyStatusTimeseries).filter(
+            BodyStatusTimeseries.user_id == query_user_id,
+            BodyStatusTimeseries.timestamp >= start_datetime,
+            BodyStatusTimeseries.timestamp < end_datetime
+        ).order_by(BodyStatusTimeseries.timestamp).all()
+
+    # First, try to get data for the requested date
+    records = query_records_for_date(target_date)
+
+    # If no data found, fall back to the most recent available data
+    if not records:
+        latest_record = db.query(BodyStatusTimeseries).filter(
+            BodyStatusTimeseries.user_id == query_user_id
+        ).order_by(BodyStatusTimeseries.timestamp.desc()).first()
+
+        if latest_record:
+            # Convert UTC timestamp to local date
+            local_timestamp = latest_record.timestamp + local_tz_offset
+            query_date = local_timestamp.date()
+            records = query_records_for_date(query_date)
+        else:
+            # No data at all for this user
+            return BodyStatusTimeseriesResponse(
+                user_id=query_user_id,
+                date=target_date,
+                requested_date=target_date,
+                data=[]
+            )
 
     # Convert to response format
     data_points = [
@@ -51,6 +81,7 @@ async def get_body_status_timeseries(
 
     return BodyStatusTimeseriesResponse(
         user_id=query_user_id,
-        date=target_date,
+        date=query_date,
+        requested_date=target_date if target_date != query_date else None,
         data=data_points
     )
