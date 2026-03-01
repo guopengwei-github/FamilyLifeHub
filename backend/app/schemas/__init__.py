@@ -345,3 +345,55 @@ class BodyStatusTimeseriesResponse(BaseModel):
     date: date_type
     requested_date: Optional[date_type] = None
     data: List[BodyStatusTimeseriesPoint]
+
+
+# ============ Health Report Schemas ============
+
+class HealthReportResponse(BaseModel):
+    """Response schema for a single health report."""
+    id: int
+    user_id: int
+    report_date: date_type
+    report_type: str  # 'morning' or 'evening'
+    content: str
+    generated_at: datetime
+    llm_model: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+    @field_serializer('generated_at')
+    def serialize_datetime(self, dt: datetime) -> str:
+        """Serialize datetime as ISO 8601 with UTC timezone."""
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+
+class HealthReportListResponse(BaseModel):
+    """Response schema for health reports list."""
+    reports: List[HealthReportResponse]
+    count: int
+
+
+class HealthReportRegenerateRequest(BaseModel):
+    """Schema for regenerating a health report."""
+    report_type: str = Field(..., description="Report type: 'morning' or 'evening'")
+    report_date: Optional[date_type] = Field(None, description="Date to regenerate (defaults to today)")
+
+
+class UserProfileUpdate(BaseModel):
+    """Schema for updating user profile (for health reports)."""
+    age: Optional[int] = Field(None, ge=1, le=150, description="Age in years")
+    gender: Optional[str] = Field(None, description="Gender: 'male', 'female', or 'other'")
+    weight_kg: Optional[float] = Field(None, ge=20, le=300, description="Weight in kilograms")
+
+
+class UserProfileResponse(BaseModel):
+    """Response schema for user profile."""
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    weight_kg: Optional[float] = None
+
+    class Config:
+        from_attributes = True

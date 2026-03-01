@@ -22,10 +22,16 @@ class User(Base):
     avatar = Column(String(255), nullable=True)  # URL or path to avatar image
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
+    # User profile for health reports
+    age = Column(Integer, nullable=True)           # 年龄
+    gender = Column(String(10), nullable=True)     # 性别: 'male', 'female', 'other'
+    weight_kg = Column(Float, nullable=True)       # 体重(kg)
+
     # Relationships
     health_metrics = relationship("HealthMetric", back_populates="user", cascade="all, delete-orphan")
     garmin_connection = relationship("GarminConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     user_preferences = relationship("UserPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    health_reports = relationship("HealthReport", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, name='{self.name}')>"
@@ -204,3 +210,33 @@ class BodyStatusTimeseries(Base):
 
     def __repr__(self):
         return f"<BodyStatusTimeseries(user_id={self.user_id}, timestamp={self.timestamp})>"
+
+
+class HealthReport(Base):
+    """
+    LLM-generated health reports.
+    Stores morning and evening reports generated from Garmin data.
+    """
+    __tablename__ = "health_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    report_date = Column(Date, nullable=False, index=True)
+    report_type = Column(String(20), nullable=False)  # 'morning' or 'evening'
+
+    input_context = Column(Text, nullable=True)   # LLM 输入（调试用）
+    content = Column(Text, nullable=False)        # 报告内容（Markdown）
+
+    generated_at = Column(DateTime, default=datetime.now(timezone.utc))
+    llm_model = Column(String(50), nullable=True)
+    retry_count = Column(Integer, default=0)
+
+    __table_args__ = (
+        Index('uq_user_date_type', 'user_id', 'report_date', 'report_type', unique=True),
+    )
+
+    # Relationships
+    user = relationship("User", back_populates="health_reports")
+
+    def __repr__(self):
+        return f"<HealthReport(user_id={self.user_id}, date={self.report_date}, type={self.report_type})>"

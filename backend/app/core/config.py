@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: Union[str, List[str]] = ["http://localhost:3000", "http://localhost:3001"]
 
+    # Zhipu LLM Configuration
+    zhipu_api_key: str = ""
+    zhipu_model: str = "glm-4-flash"
+    report_retry_max: int = 3
+    report_retry_intervals: str = "1,4,12"  # hours
+
     @property
     def database_path(self) -> str:
         """获取数据库连接字符串，优先使用 DATABASE_URL，否则使用 DATA_DIR"""
