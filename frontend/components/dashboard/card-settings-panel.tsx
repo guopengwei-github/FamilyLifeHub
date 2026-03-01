@@ -17,7 +17,7 @@ const CARD_LABELS: Record<CardId, { name: string; icon: string }> = {
   [CARD_IDS.SLEEP]: { name: '睡眠分析', icon: '😴' },
   [CARD_IDS.ACTIVITY]: { name: '运动', icon: '🏃' },
   [CARD_IDS.BODY_STATUS]: { name: '身体状态', icon: '💪' },
-  [CARD_IDS.STRESS]: { name: '压力水平', icon: '❤️' },
+  [CARD_IDS.HRV]: { name: 'HRV', icon: '💓' },
   [CARD_IDS.TRENDS]: { name: '趋势图表', icon: '📈' },
 };
 

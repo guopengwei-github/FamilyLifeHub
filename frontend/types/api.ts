@@ -259,7 +259,7 @@ export const CARD_IDS = {
   SLEEP: 'sleep',
   ACTIVITY: 'activity',
   BODY_STATUS: 'body_status',
-  STRESS: 'stress',
+  HRV: 'hrv',
   TRENDS: 'trends'
 } as const;
 

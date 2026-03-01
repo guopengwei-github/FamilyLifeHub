@@ -29,7 +29,7 @@ import { UserSummaryCard } from '@/components/dashboard/user-summary-card';
 import { SleepCard } from '@/components/dashboard/sleep-card';
 import { ActivityCard } from '@/components/dashboard/activity-card';
 import { BodyStatusCard } from '@/components/dashboard/body-status-card';
-import { StressCard } from '@/components/dashboard/stress-card';
+import { HRVCard } from '@/components/dashboard/hrv-card';
 import { TrendsCard } from '@/components/dashboard/trends-card';
 import { FamilyMemberStrip } from '@/components/dashboard/family-member-strip';
 import { MemberDetailPanel } from '@/components/dashboard/member-detail-panel';
@@ -378,10 +378,11 @@ export default function DashboardPage() {
                   />
                 )}
 
-                {/* Stress Card */}
-                {!hiddenCards.has(CARD_IDS.STRESS) && (
-                  <StressCard
+                {/* HRV Card */}
+                {!hiddenCards.has(CARD_IDS.HRV) && (
+                  <HRVCard
                     metrics={overview.metrics}
+                    trends={trends?.data ?? []}
                     hiddenCards={hiddenCards}
                     onToggleCard={(cardId, hidden) => handleToggleCard(cardId as CardId, hidden)}
                   />

@@ -6,7 +6,6 @@ import { OverviewMetric, User } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SleepCard } from './sleep-card';
-import { StressCard } from './stress-card';
 import { ActivityCard } from './activity-card';
 import { BodyStatusCard } from './body-status-card';
 import { format } from 'date-fns';
@@ -114,13 +113,6 @@ export function MemberDetailPanel({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Sleep Card */}
             <SleepCard
-              metrics={userMetrics}
-              hiddenCards={hiddenCards}
-              onToggleCard={handleToggleCard}
-            />
-
-            {/* Stress Card */}
-            <StressCard
               metrics={userMetrics}
               hiddenCards={hiddenCards}
               onToggleCard={handleToggleCard}
