@@ -57,7 +57,7 @@ async def generate_morning_report(
     content = await llm_provider.generate(
         prompt=prompt,
         system_prompt=MORNING_REPORT_SYSTEM_PROMPT,
-        max_tokens=2000
+        max_tokens=8192
     )
 
     return {
@@ -105,7 +105,7 @@ async def generate_evening_report(
     content = await llm_provider.generate(
         prompt=prompt,
         system_prompt=EVENING_REPORT_SYSTEM_PROMPT,
-        max_tokens=2000
+        max_tokens=8192
     )
 
     return {

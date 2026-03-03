@@ -42,6 +42,7 @@ export function EveningReport({ date, onReportGenerated }: EveningReportProps) {
 
   const handleReportGenerated = (newReport: HealthReport) => {
     setReport(newReport);
+    setError(null);  // 清除错误状态，确保显示新报告
     onReportGenerated?.(newReport);
   };
 

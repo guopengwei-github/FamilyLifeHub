@@ -579,6 +579,12 @@ def fetch_body_battery_events(client: Client, target_date: date) -> Optional[Dic
             logger.warning(f"DailyBodyBatteryStress.get() returned None for {target_date}")
             return None
 
+        # Log raw API response details for debugging
+        logger.info(f"DailyBodyBatteryStress response type: {type(data).__name__}")
+        bb_array_len = len(data.body_battery_values_array) if data.body_battery_values_array else 0
+        stress_array_len = len(data.stress_values_array) if data.stress_values_array else 0
+        logger.info(f"Raw arrays - body_battery_values_array: {bb_array_len}, stress_values_array: {stress_array_len}")
+
         result = {
             'body_battery_readings': [],
             'stress_readings': [],
@@ -593,7 +599,6 @@ def fetch_body_battery_events(client: Client, target_date: date) -> Optional[Dic
                         'status': values[1],
                         'level': values[2],
                     })
-            logger.debug(f"Extracted {len(result['body_battery_readings'])} body battery readings")
 
         # Process stress values array: [timestamp, stress_level]
         if data.stress_values_array:
@@ -603,10 +608,18 @@ def fetch_body_battery_events(client: Client, target_date: date) -> Optional[Dic
                         'timestamp': values[0],
                         'stress_level': values[1],
                     })
-            logger.debug(f"Extracted {len(result['stress_readings'])} stress readings")
 
-        logger.info(f"Fetched {len(result['body_battery_readings'])} body battery and "
-                    f"{len(result['stress_readings'])} stress readings for {target_date}")
+        # Log time range of extracted readings
+        if result['body_battery_readings']:
+            timestamps = [r['timestamp'] for r in result['body_battery_readings']]
+            start_ts = datetime.utcfromtimestamp(min(timestamps) / 1000)
+            end_ts = datetime.utcfromtimestamp(max(timestamps) / 1000)
+            logger.info(f"Fetched {len(result['body_battery_readings'])} body battery and "
+                        f"{len(result['stress_readings'])} stress readings for {target_date}")
+            logger.info(f"Body battery time range: {start_ts.strftime('%H:%M')} to {end_ts.strftime('%H:%M')} UTC")
+        else:
+            logger.warning(f"No body battery readings extracted for {target_date}")
+
         return result
 
     except Exception as e:
@@ -987,6 +1000,11 @@ def save_body_status_timeseries(
     """
     count = 0
 
+    # Log data source info for debugging
+    bb_events_count = len(body_battery_events.get('body_battery_readings', [])) if body_battery_events else 0
+    stress_events_count = len(body_battery_events.get('stress_readings', [])) if body_battery_events else 0
+    logger.info(f"save_body_status_timeseries: body_battery_events has {bb_events_count} BB, {stress_events_count} stress readings")
+
     # Delete existing timeseries data for this user and date
     # Convert local date to UTC range to match how data is saved (UTC naive datetime)
     local_tz_offset = datetime.now().astimezone().utcoffset() or timedelta(0)
@@ -1002,6 +1020,8 @@ def save_body_status_timeseries(
 
     # Collect all data points by timestamp
     data_by_timestamp: Dict[datetime, Dict[str, Any]] = {}
+    from_events_count = 0  # Track how many records came from 24h events data
+    from_sleep_count = 0   # Track how many records came from sleep fallback
 
     # Process body battery events (full 24-hour data) if available
     # body_battery_events is now a dict with 'body_battery_readings' and 'stress_readings' lists
@@ -1015,6 +1035,7 @@ def save_body_status_timeseries(
                 if ts not in data_by_timestamp:
                     data_by_timestamp[ts] = {}
                 data_by_timestamp[ts]['body_battery'] = _safe_int(level)
+                from_events_count += 1
 
         # Process stress readings
         for reading in body_battery_events.get('stress_readings', []):
@@ -1035,9 +1056,10 @@ def save_body_status_timeseries(
                 ts = datetime.utcfromtimestamp(ts_millis / 1000)
                 if ts not in data_by_timestamp:
                     data_by_timestamp[ts] = {}
-                # Only set if not already set from events data
-                if 'body_battery' not in data_by_timestamp[ts]:
-                    data_by_timestamp[ts]['body_battery'] = _safe_int(value)
+                    # Only set if not already set from events data
+                    if 'body_battery' not in data_by_timestamp[ts]:
+                        data_by_timestamp[ts]['body_battery'] = _safe_int(value)
+                        from_sleep_count += 1
 
     if 'sleepStress' in garmin_data and garmin_data['sleepStress']:
         for item in garmin_data['sleepStress']:
@@ -1063,7 +1085,17 @@ def save_body_status_timeseries(
         db_session.add(record)
         count += 1
 
-    logger.debug(f"Saved {count} body status timeseries records for {target_date}")
+    # Log detailed save summary with time range
+    if data_by_timestamp:
+        timestamps = sorted(data_by_timestamp.keys())
+        start_time = timestamps[0].strftime('%H:%M')
+        end_time = timestamps[-1].strftime('%H:%M')
+        logger.info(f"Saved {count} timeseries records for {target_date}: "
+                    f"{from_events_count} from 24h API, {from_sleep_count} from sleep fallback")
+        logger.info(f"Timeseries time range: {start_time} to {end_time} UTC ({len(timestamps)} points)")
+    else:
+        logger.warning(f"No timeseries data to save for {target_date}")
+
     return count
 
 

@@ -23,9 +23,11 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     # User profile for health reports
-    age = Column(Integer, nullable=True)           # 年龄
+    age = Column(Integer, nullable=True)           # 年龄 (deprecated: 从 birth_date 计算)
     gender = Column(String(10), nullable=True)     # 性别: 'male', 'female', 'other'
     weight_kg = Column(Float, nullable=True)       # 体重(kg)
+    birth_date = Column(Date, nullable=True)       # 出生日期
+    height_cm = Column(Float, nullable=True)       # 身高(cm)
 
     # Relationships
     health_metrics = relationship("HealthMetric", back_populates="user", cascade="all, delete-orphan")

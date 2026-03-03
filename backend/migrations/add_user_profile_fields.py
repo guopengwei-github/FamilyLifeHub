@@ -52,6 +52,12 @@ def migrate():
     if 'weight_kg' not in columns:
         migrations_needed.append(('weight_kg', 'REAL'))
 
+    if 'birth_date' not in columns:
+        migrations_needed.append(('birth_date', 'DATE'))
+
+    if 'height_cm' not in columns:
+        migrations_needed.append(('height_cm', 'REAL'))
+
     if not migrations_needed:
         print("User profile columns already exist, skipping migration")
         conn.close()

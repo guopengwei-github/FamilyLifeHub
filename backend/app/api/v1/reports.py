@@ -3,7 +3,7 @@ API endpoints for health reports.
 
 Provides endpoints to retrieve and regenerate morning/evening health reports.
 """
-from datetime import date
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -25,11 +25,23 @@ from app.core.config import settings
 router = APIRouter(prefix="/reports", tags=["Health Reports"])
 
 
+def _calculate_age(birth_date: date | None) -> int | None:
+    """Calculate age from birth date."""
+    if birth_date is None:
+        return None
+    today = date.today()
+    age = today.year - birth_date.year
+    if (today.month, today.day) < (birth_date.month, birth_date.day):
+        age -= 1
+    return age
+
+
 def get_llm_provider() -> ZhipuProvider:
     """Get configured LLM provider."""
     return ZhipuProvider(
         api_key=settings.zhipu_api_key,
-        model=settings.zhipu_model
+        model=settings.zhipu_model,
+        base_url=settings.zhipu_base_url
     )
 
 
@@ -198,9 +210,11 @@ async def get_user_profile(
 ):
     """Get user profile for health report personalization."""
     return UserProfileResponse(
-        age=current_user.age,
+        birth_date=current_user.birth_date,
         gender=current_user.gender,
-        weight_kg=current_user.weight_kg
+        weight_kg=current_user.weight_kg,
+        height_cm=current_user.height_cm,
+        age=_calculate_age(current_user.birth_date)
     )
 
 
@@ -211,8 +225,8 @@ async def update_user_profile(
     current_user: User = Depends(get_current_user)
 ):
     """Update user profile for health report personalization."""
-    if profile.age is not None:
-        current_user.age = profile.age
+    if profile.birth_date is not None:
+        current_user.birth_date = profile.birth_date
     if profile.gender is not None:
         if profile.gender not in ('male', 'female', 'other'):
             raise HTTPException(
@@ -222,12 +236,16 @@ async def update_user_profile(
         current_user.gender = profile.gender
     if profile.weight_kg is not None:
         current_user.weight_kg = profile.weight_kg
+    if profile.height_cm is not None:
+        current_user.height_cm = profile.height_cm
 
     db.commit()
     db.refresh(current_user)
 
     return UserProfileResponse(
-        age=current_user.age,
+        birth_date=current_user.birth_date,
         gender=current_user.gender,
-        weight_kg=current_user.weight_kg
+        weight_kg=current_user.weight_kg,
+        height_cm=current_user.height_cm,
+        age=_calculate_age(current_user.birth_date)
     )

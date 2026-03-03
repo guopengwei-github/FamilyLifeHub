@@ -384,16 +384,19 @@ class HealthReportRegenerateRequest(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     """Schema for updating user profile (for health reports)."""
-    age: Optional[int] = Field(None, ge=1, le=150, description="Age in years")
+    birth_date: Optional[date_type] = Field(None, description="Birth date (YYYY-MM-DD)")
     gender: Optional[str] = Field(None, description="Gender: 'male', 'female', or 'other'")
     weight_kg: Optional[float] = Field(None, ge=20, le=300, description="Weight in kilograms")
+    height_cm: Optional[float] = Field(None, ge=50, le=300, description="Height in centimeters")
 
 
 class UserProfileResponse(BaseModel):
     """Response schema for user profile."""
-    age: Optional[int] = None
+    birth_date: Optional[date_type] = None
     gender: Optional[str] = None
     weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    age: Optional[int] = None  # Calculated from birth_date
 
     class Config:
         from_attributes = True

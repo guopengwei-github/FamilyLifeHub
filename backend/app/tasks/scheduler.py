@@ -27,7 +27,8 @@ def get_llm_provider() -> ZhipuProvider:
     """Get configured LLM provider."""
     return ZhipuProvider(
         api_key=settings.ZHIPU_API_KEY,
-        model=settings.ZHIPU_MODEL
+        model=settings.ZHIPU_MODEL,
+        base_url=settings.ZHIPU_BASE_URL
     )
 
 

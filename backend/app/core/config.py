@@ -40,7 +40,8 @@ class Settings(BaseSettings):
 
     # Zhipu LLM Configuration
     zhipu_api_key: str = ""
-    zhipu_model: str = "glm-4-flash"
+    zhipu_model: str = "glm-5"
+    zhipu_base_url: str = "https://open.bigmodel.cn/api/anthropic"
     report_retry_max: int = 3
     report_retry_intervals: str = "1,4,12"  # hours
 

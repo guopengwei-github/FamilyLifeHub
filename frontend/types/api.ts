@@ -304,13 +304,16 @@ export interface HealthReportRegenerateRequest {
 }
 
 export interface UserProfile {
-  age: number | null;
+  birth_date: string | null;
   gender: string | null;
   weight_kg: number | null;
+  height_cm: number | null;
+  age: number | null;
 }
 
 export interface UserProfileUpdate {
-  age?: number;
+  birth_date?: string;
   gender?: 'male' | 'female' | 'other';
   weight_kg?: number;
+  height_cm?: number;
 }
