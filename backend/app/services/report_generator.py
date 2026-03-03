@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.services.llm.base import LLMProvider
 from app.services.llm.prompts import (
+    GARMIN_DATA_GLOSSARY,
     MORNING_REPORT_SYSTEM_PROMPT,
     EVENING_REPORT_SYSTEM_PROMPT,
     format_morning_report_prompt,
@@ -50,13 +51,14 @@ async def generate_morning_report(
         hrv_data=data['hrv_data'],
         body_battery=data['body_battery'],
         activity_data=data['activity_data'],
-        user_profile=data['user_profile']
+        user_profile=data['user_profile'],
+        sleep_metrics=data.get('sleep_metrics')
     )
 
     # Generate report
     content = await llm_provider.generate(
         prompt=prompt,
-        system_prompt=MORNING_REPORT_SYSTEM_PROMPT,
+        system_prompt=GARMIN_DATA_GLOSSARY + MORNING_REPORT_SYSTEM_PROMPT,
         max_tokens=8192
     )
 
@@ -98,13 +100,14 @@ async def generate_evening_report(
         stress_data=data['stress_data'],
         body_battery=data['body_battery'],
         activity_data=data['activity_data'],
-        user_profile=data['user_profile']
+        user_profile=data['user_profile'],
+        resting_hr=data.get('resting_hr')
     )
 
     # Generate report
     content = await llm_provider.generate(
         prompt=prompt,
-        system_prompt=EVENING_REPORT_SYSTEM_PROMPT,
+        system_prompt=GARMIN_DATA_GLOSSARY + EVENING_REPORT_SYSTEM_PROMPT,
         max_tokens=8192
     )
 

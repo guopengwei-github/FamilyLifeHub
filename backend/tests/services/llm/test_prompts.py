@@ -81,7 +81,7 @@ class TestFormatMorningReportPrompt:
         assert "7日平均: 7.2小时" in result
 
     def test_with_hrv_data(self):
-        """Should include HRV data."""
+        """Should include HRV data in sleep recovery section."""
         result = format_morning_report_prompt(
             report_date=date(2026, 3, 1),
             sleep_data=None,
@@ -93,7 +93,9 @@ class TestFormatMorningReportPrompt:
             body_battery=None,
             activity_data=None
         )
-        assert "昨夜HRV: 45ms" in result
+        # HRV now in sleep recovery section with combined format
+        assert "睡眠期间恢复指标" in result
+        assert "HRV: 45ms" in result
         assert "7日均值: 42ms" in result
         assert "3日趋势: 上升" in result
 
@@ -107,6 +109,43 @@ class TestFormatMorningReportPrompt:
             activity_data=None
         )
         assert "今晨起始值: 85" in result
+
+    def test_with_body_battery_sleep_recovery(self):
+        """Should include body battery before/after sleep data."""
+        result = format_morning_report_prompt(
+            report_date=date(2026, 3, 1),
+            sleep_data=None,
+            hrv_data=None,
+            body_battery={
+                'before_sleep': 25,
+                'after_sleep': 68,
+                'charged': 43
+            },
+            activity_data=None
+        )
+        assert "入睡前: 25" in result
+        assert "醒来后: 68" in result
+        assert "睡眠补充: +43" in result
+
+    def test_with_sleep_metrics(self):
+        """Should include sleep period metrics."""
+        result = format_morning_report_prompt(
+            report_date=date(2026, 3, 1),
+            sleep_data=None,
+            hrv_data=None,
+            body_battery=None,
+            activity_data=None,
+            sleep_metrics={
+                'spo2': 96.5,
+                'respiration_rate': 14.2,
+                'stress_level': 18,
+                'resting_hr': 58
+            }
+        )
+        assert "睡眠血氧饱和度: 96.5%" in result
+        assert "睡眠呼吸频率: 14.2 次/分钟" in result
+        assert "睡眠期间压力: 18" in result
+        assert "静息心率: 58 bpm" in result
 
 
 class TestFormatEveningReportPrompt:
@@ -142,7 +181,9 @@ class TestFormatEveningReportPrompt:
             body_battery=None,
             activity_data=None
         )
-        assert "今日平均压力: 35" in result
+        # Updated to match new "全天压力分布" section
+        assert "全天压力分布" in result
+        assert "今日全天平均压力: 35" in result
         assert "高压力时长: 60分钟" in result
         assert "7日平均压力: 38" in result
 
@@ -162,5 +203,18 @@ class TestFormatEveningReportPrompt:
         )
         assert "今晨起始值: 90" in result
         assert "当前值: 25" in result
-        assert "今日消耗: 65" in result
+        # Consumption now shows as negative value
+        assert "今日消耗: -65" in result
         assert "3日平均消耗: 70" in result
+
+    def test_with_resting_hr(self):
+        """Should include resting heart rate in evening report."""
+        result = format_evening_report_prompt(
+            report_date=date(2026, 3, 1),
+            heart_rate_data=None,
+            stress_data=None,
+            body_battery=None,
+            activity_data=None,
+            resting_hr=56
+        )
+        assert "静息心率(睡眠期间): 56 bpm" in result

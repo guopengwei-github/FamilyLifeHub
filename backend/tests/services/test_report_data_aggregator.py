@@ -30,6 +30,7 @@ class TestAggregateMorningReportData:
         assert 'sleep_data' in result
         assert 'hrv_data' in result
         assert 'body_battery' in result
+        assert 'sleep_metrics' in result  # NEW: sleep period metrics
         assert 'activity_data' in result
         assert 'user_profile' in result
 
@@ -67,3 +68,4 @@ class TestAggregateEveningReportData:
         assert 'body_battery' in result
         assert 'activity_data' in result
         assert 'user_profile' in result
+        assert 'resting_hr' in result  # NEW: resting heart rate

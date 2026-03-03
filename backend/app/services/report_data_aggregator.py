@@ -25,7 +25,7 @@ def aggregate_morning_report_data(
         report_date: Date of the report.
 
     Returns:
-        Dictionary with sleep_data, hrv_data, body_battery, activity_data, user_profile.
+        Dictionary with sleep_data, hrv_data, body_battery, activity_data, user_profile, sleep_metrics.
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -33,6 +33,7 @@ def aggregate_morning_report_data(
         'sleep_data': _get_sleep_data(db, user_id, report_date),
         'hrv_data': _get_hrv_data(db, user_id, report_date),
         'body_battery': _get_morning_body_battery(db, user_id, report_date),
+        'sleep_metrics': _get_sleep_period_metrics(db, user_id, report_date),
         'activity_data': _get_recent_activity_data(db, user_id, report_date),
         'user_profile': _get_user_profile(user)
     }
@@ -52,16 +53,24 @@ def aggregate_evening_report_data(
         report_date: Date of the report.
 
     Returns:
-        Dictionary with heart_rate_data, stress_data, body_battery, activity_data, user_profile.
+        Dictionary with heart_rate_data, stress_data, body_battery, activity_data, user_profile, resting_hr.
     """
     user = db.query(User).filter(User.id == user_id).first()
+
+    # Get resting HR from today's metric
+    metric = db.query(HealthMetric).filter(
+        HealthMetric.user_id == user_id,
+        HealthMetric.date == report_date
+    ).first()
+    resting_hr = metric.resting_hr if metric else None
 
     return {
         'heart_rate_data': _get_heart_rate_data(db, user_id, report_date),
         'stress_data': _get_stress_data(db, user_id, report_date),
         'body_battery': _get_evening_body_battery(db, user_id, report_date),
         'activity_data': _get_today_activity_data(db, user_id, report_date),
-        'user_profile': _get_user_profile(user)
+        'user_profile': _get_user_profile(user),
+        'resting_hr': resting_hr
     }
 
 
@@ -158,16 +167,59 @@ def _get_hrv_data(db: Session, user_id: int, report_date: date) -> dict | None:
 
 
 def _get_morning_body_battery(db: Session, user_id: int, report_date: date) -> dict | None:
-    """Get morning body battery starting value."""
+    """Get morning body battery starting value with before/after sleep values."""
     metric = db.query(HealthMetric).filter(
         HealthMetric.user_id == user_id,
         HealthMetric.date == report_date
     ).first()
 
-    if metric and metric.body_battery is not None:
-        return {'morning_value': metric.body_battery}
+    if not metric:
+        return None
 
-    return None
+    result = {}
+
+    if metric.body_battery is not None:
+        result['morning_value'] = metric.body_battery
+        result['after_sleep'] = metric.body_battery
+
+    if metric.body_battery_before_sleep is not None:
+        result['before_sleep'] = metric.body_battery_before_sleep
+
+    # 计算睡眠充电量
+    if 'before_sleep' in result and 'after_sleep' in result:
+        result['charged'] = result['after_sleep'] - result['before_sleep']
+
+    return result if result else None
+
+
+def _get_sleep_period_metrics(db: Session, user_id: int, report_date: date) -> dict | None:
+    """Get sleep period metrics: SpO2, respiration rate, and stress during sleep."""
+    # 睡眠数据记录在前一天
+    yesterday = report_date - timedelta(days=1)
+
+    metric = db.query(HealthMetric).filter(
+        HealthMetric.user_id == user_id,
+        HealthMetric.date == yesterday
+    ).first()
+
+    if not metric:
+        return None
+
+    result = {}
+
+    if metric.spo2 is not None:
+        result['spo2'] = metric.spo2
+
+    if metric.respiration_rate is not None:
+        result['respiration_rate'] = metric.respiration_rate
+
+    if metric.stress_level is not None:
+        result['stress_level'] = metric.stress_level
+
+    if metric.resting_hr is not None:
+        result['resting_hr'] = metric.resting_hr
+
+    return result if result else None
 
 
 def _get_recent_activity_data(db: Session, user_id: int, report_date: date) -> dict | None:

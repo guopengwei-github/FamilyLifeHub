@@ -95,6 +95,7 @@ class HealthMetric(Base):
     calories = Column(Integer, nullable=True)  # 卡路里消耗
     distance_km = Column(Float, nullable=True)  # 距离(公里)
     body_battery = Column(Integer, nullable=True)  # 身体电量 (0-100)
+    body_battery_before_sleep = Column(Integer, nullable=True)  # 入睡前身体电量
     spo2 = Column(Float, nullable=True)  # 血氧饱和度 (%)
     respiration_rate = Column(Float, nullable=True)  # 呼吸频率 (次/分)
     resting_hr = Column(Integer, nullable=True)  # 静息心率 (BPM)
