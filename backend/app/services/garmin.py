@@ -778,6 +778,7 @@ def map_garmin_to_health_metric(
         'calories': None,
         'distance_km': None,
         'body_battery': None,
+        'body_battery_before_sleep': None,
         'spo2': None,
         'respiration_rate': None,
         'resting_hr': None,
@@ -820,14 +821,18 @@ def map_garmin_to_health_metric(
             metric['stress_level'] = _safe_int(sum(stress_values) / len(stress_values))
 
     # Extract body battery - prefer real-time data over sleep data
+    # Also extract before_sleep value from sleepBodyBattery array
     if body_battery_data and body_battery_data.get('current_body_battery') is not None:
         metric['body_battery'] = _safe_int(body_battery_data['current_body_battery'])
         logger.debug(f"    Using real-time body_battery: {metric['body_battery']}")
     elif 'sleepBodyBattery' in garmin_data and garmin_data['sleepBodyBattery']:
         bb_values = [b.get('value') for b in garmin_data['sleepBodyBattery'] if b.get('value') is not None]
         if bb_values:
+            # 最后一个值是醒来后身体电量
             metric['body_battery'] = _safe_int(bb_values[-1])
-            logger.debug(f"    Using sleep body_battery (fallback): {metric['body_battery']}")
+            # 第一个值是入睡前身体电量
+            metric['body_battery_before_sleep'] = _safe_int(bb_values[0])
+            logger.debug(f"    Using sleep body_battery (fallback): {metric['body_battery']}, before_sleep: {metric['body_battery_before_sleep']}")
 
     # Extract SpO2 (case-insensitive key lookup)
     spo2_key = next((k for k in garmin_data.keys() if 'spo2sleepsummarydto' in k.lower()), None)
