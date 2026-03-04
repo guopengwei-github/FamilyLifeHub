@@ -1271,6 +1271,16 @@ def refresh_garmin_data(
                 if daily_summary:
                     save_body_status_timeseries(user_id, daily_summary, current_date, db, body_battery_events)
 
+                # Fetch and save activities for this date
+                try:
+                    activities = fetch_daily_activities(client, current_date)
+                    if activities:
+                        activities_saved = save_garmin_activities(user_id, activities, current_date, db)
+                        sync_results['activities_created'] += activities_saved
+                        logger.info(f"Saved {activities_saved} activities for {current_date}")
+                except Exception as act_e:
+                    logger.warning(f"Error fetching activities for {current_date}: {act_e}")
+
             except Exception as e:
                 logger.error(f"Error processing data for {current_date}: {e}")
                 sync_results['errors'].append(f"{current_date}: {str(e)}")

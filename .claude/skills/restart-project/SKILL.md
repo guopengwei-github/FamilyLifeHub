@@ -27,6 +27,10 @@ description: 重启 FamilyLifeHub 项目的前后端服务。当用户说"重启
 - ❌ 错误尝试：使用 `grep` 和 `awk` 处理 Windows 命令输出
   - 原因：应使用 `findstr` 替代 `grep`
 
+- ❌ 错误尝试：反复尝试杀同一批 PID
+  - 原因：进程可能已死，但 netstat 仍显示端口占用（僵尸连接、TIME_WAIT 等）
+  - 正确做法：taskkill 失败后直接忽略，继续启动服务
+
 ## 3. 成功工作流 (Best Practices)
 
 1. **查找占用端口的进程**
@@ -34,18 +38,29 @@ description: 重启 FamilyLifeHub 项目的前后端服务。当用户说"重启
    netstat -ano | findstr ":3000 :3001 :8000" | findstr LISTENING
    ```
 
-2. **杀掉现有进程**（注意双斜杠语法）
+2. **杀掉现有进程**（注意双斜杠语法，忽略"进程不存在"错误）
    ```bash
-   taskkill //F //PID <pid>
+   # 尝试杀进程，失败就忽略（进程可能已死）
+   taskkill //F //PID <pid> 2>/dev/null || true
    ```
 
-3. **后台启动后端服务**
+3. **如果按 PID 杀不掉，尝试按程序名杀**（备选方案）
    ```bash
-   cd D:/ai/family_life_hub/backend 
+   taskkill //F //IM python.exe 2>/dev/null
+   taskkill //F //IM node.exe 2>/dev/null
+   ```
+
+4. **直接启动服务**（不要反复检查端口）
+   - 如果端口真的被占用，服务启动会报错
+   - 直接尝试启动比反复检查更高效
+
+5. **后台启动后端服务**
+   ```bash
+   cd D:/ai/family_life_hub/backend
    venv/Scripts/python.exe main.py
    ```
 
-4. **后台启动前端服务**
+6. **后台启动前端服务**
    ```bash
    cd D:/ai/family_life_hub/frontend && npm run dev
    ```
@@ -55,19 +70,32 @@ description: 重启 FamilyLifeHub 项目的前后端服务。当用户说"重启
 ### 完整重启脚本（Windows Git Bash）
 
 ```bash
-# 1. 查找并记录占用端口的 PID
-netstat -ano | findstr ":3000  :8000" | findstr LISTENING
+# 1. 查找占用端口的 PID
+netstat -ano | findstr ":3000 :8000" | findstr LISTENING
 
-# 2. 杀掉进程（替换为实际 PID）
-taskkill //F //PID <frontend_pid>
-taskkill //F //PID <backend_pid>
+# 2. 尝试杀掉进程（失败就忽略，进程可能已死）
+for pid in <pid1> <pid2> <pid3>; do
+  taskkill //F //PID $pid 2>/dev/null || true
+done
 
-# 3. 启动后端（后台运行）
-cd D:/ai/family_life_hub/backend && venv/Scripts/python.exe main.py
+# 3. 如果还有残留，按程序名杀（备选方案）
+taskkill //F //IM python.exe 2>/dev/null || true
+taskkill //F //IM node.exe 2>/dev/null || true
 
-# 4. 启动前端（后台运行）
+# 4. 直接启动服务（不要反复检查端口）
+cd D:/ai/family_life_hub/backend && venv/Scripts/python.exe main.py &
 cd D:/ai/family_life_hub/frontend && npm run dev &
+
+# 5. 等待几秒后验证服务是否启动
+sleep 3 && netstat -ano | findstr ":3000 :8000" | findstr LISTENING
 ```
+
+### 重要提示
+
+- **不要反复检查端口再杀进程**：netstat 可能显示已死进程的端口占用
+- **一次杀不掉就放弃**：用 `2>/dev/null || true` 静默错误并继续
+- **直接启动服务**：让服务自己报错是否端口真正被占用
+- **备选方案**：按程序名 (`//IM`) 杀进程可以清理残留
 
 ### 服务端口配置
 

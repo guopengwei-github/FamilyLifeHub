@@ -8,6 +8,19 @@ FamilyLifeHub is a self-hosted family life data hub for tracking and analyzing h
 
 ## Development Commands
 
+### Git Push
+此项目使用自定义 SSH 密钥进行 GitHub 认证。推送时必须指定密钥文件：
+```bash
+# Windows CMD
+set GIT_SSH_COMMAND=ssh -i "C:\Users\guopengwei\.ssh\id_rsa_github" && git push origin master
+
+# Windows PowerShell
+$env:GIT_SSH_COMMAND='ssh -i "C:\Users\guopengwei\.ssh\id_rsa_github"'; git push origin master
+
+# Git Bash / WSL
+GIT_SSH_COMMAND='ssh -i /c/Users/guopengwei/.ssh/id_rsa_github' git push origin master
+```
+
 ### Docker (Recommended)
 ```bash
 # Start all services

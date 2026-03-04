@@ -196,7 +196,10 @@ export function ActivityCard({
           {loadingActivities ? (
             <div className="text-sm text-muted-foreground text-center py-4">加载中...</div>
           ) : activities.length === 0 ? (
-            <div className="text-sm text-muted-foreground text-center py-4">暂无活动记录</div>
+            <div className="text-sm text-muted-foreground text-center py-4 space-y-2">
+              <p>暂无单独活动记录</p>
+              <p className="text-xs">今日运动数据已记录在上方汇总中</p>
+            </div>
           ) : (
             <div className="space-y-2">
               {activities.slice(0, 3).map((activity) => (
