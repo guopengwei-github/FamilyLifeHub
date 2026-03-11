@@ -28,7 +28,7 @@ export function EveningReport({ date, onReportGenerated }: EveningReportProps) {
         setReport(data);
       } catch (err: any) {
         if (err.status === 404) {
-          setError('今日晚间报告尚未生成');
+          setError('该日期的晚间报告尚未生成');
         } else {
           setError('加载报告失败');
         }
