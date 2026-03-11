@@ -28,7 +28,7 @@ export function MorningReport({ date, onReportGenerated }: MorningReportProps) {
         setReport(data);
       } catch (err: any) {
         if (err.status === 404) {
-          setError('今日晨间报告尚未生成');
+          setError('该日期的晨间报告尚未生成');
         } else {
           setError('加载报告失败');
         }

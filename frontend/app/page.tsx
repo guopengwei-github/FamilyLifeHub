@@ -337,10 +337,10 @@ export default function DashboardPage() {
           {/* Main Content */}
           {!loading && !error && summary && overview && (
             <div className="space-y-8">
-              {/* Health Reports - Always show today's reports regardless of selected date */}
+              {/* Health Reports - Show reports for selected date */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <MorningReport />
-                <EveningReport />
+                <MorningReport date={format(selectedDate, 'yyyy-MM-dd')} />
+                <EveningReport date={format(selectedDate, 'yyyy-MM-dd')} />
               </div>
 
               {/* User Summary Card */}
