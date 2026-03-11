@@ -24,8 +24,13 @@ export function DateNavigator({ selectedDate, onDateChange, loading = false }: D
   };
 
   const goToNextDay = () => {
+    const today = new Date();
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + 1);
+    // 不允许选择未来日期
+    if (newDate > today) {
+      return;
+    }
     onDateChange(newDate);
   };
 
@@ -80,6 +85,7 @@ export function DateNavigator({ selectedDate, onDateChange, loading = false }: D
             mode="single"
             selected={selectedDate}
             onSelect={handleDateSelect}
+            disabled={(date) => date > new Date()}
             initialFocus
           />
         </PopoverContent>
@@ -90,7 +96,7 @@ export function DateNavigator({ selectedDate, onDateChange, loading = false }: D
         variant="outline"
         size="icon"
         onClick={goToNextDay}
-        disabled={loading}
+        disabled={loading || isToday(selectedDate)}
         className="h-9 w-9"
         aria-label="后一天"
       >
