@@ -3,13 +3,16 @@ FamilyLifeHub Backend - Main Application Entry Point
 
 A private family life data hub for tracking health and work metrics.
 """
+import logging
 from fastapi import FastAPI
+
+logger = logging.getLogger(__name__)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.api.v1 import ingest, dashboard, users, auth, health, garmin, preferences, timeseries, reports
+from app.api.v1 import ingest, dashboard, users, auth, health, garmin, preferences, timeseries, reports, smtp_config, scheduler_logs
 
 # Run database migrations before creating tables
 from migrations.add_sleep_stage_columns import migrate as migrate_sleep_stages
@@ -53,29 +56,17 @@ app.include_router(garmin.router, prefix="/api/v1")
 app.include_router(preferences.router, prefix="/api/v1")
 app.include_router(timeseries.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
+app.include_router(smtp_config.router, prefix="/api/v1")
+app.include_router(scheduler_logs.router, prefix="/api/v1")
 
 
-@app.get("/")
-async def root():
-    """Root endpoint - API health check."""
-    return {
-        "message": "FamilyLifeHub API is running",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+@app.on_event("startup")
+def startup_event():
+    """Initialize scheduler on application startup."""
+    if not settings.scheduler_enabled:
+        return
 
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for monitoring."""
-    return {"status": "healthy"}
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.debug
-    )
+    from app.tasks.scheduler import start_scheduler
+    logger.info("Scheduler started on application startup")
+    start_scheduler()

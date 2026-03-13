@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     report_retry_max: int = 3
     report_retry_intervals: str = "1,4,12"  # hours
 
+    # Scheduler Configuration
+    scheduler_enabled: bool = True
+    scheduler_morning_hour: int = 10  # 10:00 AM for morning report
+    scheduler_evening_hour: int = 21  # 21:00 (9 PM) for evening report
+    scheduler_garmin_sync_days: int = 7  # Days to sync before generating report
+
     @property
     def database_path(self) -> str:
         """获取数据库连接字符串，优先使用 DATABASE_URL，否则使用 DATA_DIR"""

@@ -29,11 +29,15 @@ class User(Base):
     birth_date = Column(Date, nullable=True)       # 出生日期
     height_cm = Column(Float, nullable=True)       # 身高(cm)
 
+    # Notification settings
+    mail_for_notification = Column(String(255), nullable=True)  # 接收报告通知的邮箱地址
+
     # Relationships
     health_metrics = relationship("HealthMetric", back_populates="user", cascade="all, delete-orphan")
     garmin_connection = relationship("GarminConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     user_preferences = relationship("UserPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
     health_reports = relationship("HealthReport", back_populates="user", cascade="all, delete-orphan")
+    smtp_config = relationship("SmtpConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, name='{self.name}')>"
@@ -243,3 +247,8 @@ class HealthReport(Base):
 
     def __repr__(self):
         return f"<HealthReport(user_id={self.user_id}, date={self.report_date}, type={self.report_type})>"
+
+
+# Import additional models to register them with SQLAlchemy
+from app.models.scheduler import SchedulerLog
+from app.models.smtp_config import SmtpConfig
