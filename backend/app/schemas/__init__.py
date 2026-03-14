@@ -400,3 +400,131 @@ class UserProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ============ SMTP Configuration Schemas ============
+
+class SmtpConfigBase(BaseModel):
+    """Base SMTP configuration schema."""
+    smtp_host: str = Field(..., min_length=1, max_length=255, description="SMTP server host")
+    smtp_port: int = Field(465, ge=1, le=65535, description="SMTP server port")
+    smtp_user: str = Field(..., min_length=1, max_length=255, description="SMTP username")
+    smtp_password: str = Field(..., min_length=1, description="SMTP password or app token")
+    use_ssl: int = Field(1, ge=0, le=1, description="Use SSL/TLS (1) or STARTTLS (0)")
+    sender_email: Optional[str] = Field(None, max_length=255, description="Sender email address")
+    sender_name: Optional[str] = Field(None, max_length=100, description="Sender display name")
+
+
+class SmtpConfigCreate(SmtpConfigBase):
+    """Schema for creating SMTP configuration."""
+    pass
+
+
+class SmtpConfigUpdate(BaseModel):
+    """Schema for updating SMTP configuration."""
+    smtp_host: Optional[str] = Field(None, min_length=1, max_length=255)
+    smtp_port: Optional[int] = Field(None, ge=1, le=65535)
+    smtp_user: Optional[str] = Field(None, min_length=1, max_length=255)
+    smtp_password: Optional[str] = Field(None, min_length=1)
+    use_ssl: Optional[int] = Field(None, ge=0, le=1)
+    sender_email: Optional[str] = Field(None, max_length=255)
+    sender_name: Optional[str] = Field(None, max_length=100)
+    is_active: Optional[int] = Field(None, ge=0, le=1)
+
+
+class SmtpConfigResponse(BaseModel):
+    """Response schema for SMTP configuration (password masked)."""
+    id: int
+    user_id: int
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str  # Will be masked in API response
+    use_ssl: int
+    sender_email: Optional[str] = None
+    sender_name: Optional[str] = None
+    is_active: int
+    last_test_at: Optional[datetime] = None
+    last_test_status: Optional[str] = None
+    last_error: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+    @field_serializer('smtp_password')
+    def mask_password(self, password: str) -> str:
+        """Mask password in response."""
+        if not password:
+            return ""
+        if len(password) <= 4:
+            return "****"
+        return password[:2] + "****" + password[-2:]
+
+    @field_serializer('last_test_at', 'created_at', 'updated_at')
+    def serialize_datetime(self, dt: Optional[datetime]) -> Optional[str]:
+        """Serialize datetime as ISO 8601 with UTC timezone."""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+
+class SmtpTestRequest(BaseModel):
+    """Schema for testing SMTP connection."""
+    pass
+
+
+class SmtpTestResponse(BaseModel):
+    """Response schema for SMTP connection test."""
+    success: bool
+    message: str
+
+
+# ============ User Notification Settings Schemas ============
+
+class UserNotificationSettingsUpdate(BaseModel):
+    """Schema for updating user notification settings."""
+    mail_for_notification: Optional[str] = Field(None, max_length=255, description="Email for notifications")
+
+
+class UserNotificationSettingsResponse(BaseModel):
+    """Response schema for user notification settings."""
+    mail_for_notification: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ============ Scheduler Log Schemas ============
+
+class SchedulerLogResponse(BaseModel):
+    """Response schema for scheduler log entry."""
+    id: int
+    task_name: str
+    user_id: Optional[int] = None
+    status: str
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_ms: Optional[int] = None
+    message: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+    @field_serializer('started_at', 'completed_at')
+    def serialize_datetime(self, dt: Optional[datetime]) -> Optional[str]:
+        """Serialize datetime as ISO 8601 with UTC timezone."""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+
+
+class SchedulerLogListResponse(BaseModel):
+    """Response schema for scheduler logs list."""
+    logs: List[SchedulerLogResponse]
+    count: int
