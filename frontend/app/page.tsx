@@ -36,8 +36,8 @@ import { MemberDetailPanel } from '@/components/dashboard/member-detail-panel';
 import { CardSettingsPanel } from '@/components/dashboard/card-settings-panel';
 import { DateNavigator } from '@/components/dashboard/date-navigator';
 import { MorningReport, EveningReport } from '@/components/reports';
-import { format } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import { format, parse, isValid } from 'date-fns';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
 // Garmin sync status types
 type GarminSyncStatus = 'not_connected' | 'fresh' | 'stale' | 'severely_stale' | 'syncing' | 'error';
@@ -50,6 +50,8 @@ interface GarminSyncState {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   // Auth state
   const { user: authUser } = useAuth();
 
@@ -72,7 +74,16 @@ export default function DashboardPage() {
   const [selectedMember, setSelectedMember] = useState<User | null>(null);
 
   // Date navigation state - default to yesterday since Garmin sleep data has delay
+  // But restore from URL parameter if present
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam) {
+      const parsed = parse(dateParam, 'yyyy-MM-dd', new Date());
+      if (isValid(parsed) && parsed <= new Date()) {
+        return parsed;
+      }
+    }
+    // Default to yesterday
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return yesterday;
@@ -233,10 +244,13 @@ export default function DashboardPage() {
     }
   }, [viewingUser, selectedDate]);
 
-  // Handle date change
+  // Handle date change - update both state and URL
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
-    // Data will be refetched by the useEffect when selectedDate changes
+    // Update URL parameter without full navigation
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('date', format(date, 'yyyy-MM-dd'));
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   // Handle toggle card visibility
