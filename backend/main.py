@@ -16,9 +16,11 @@ from app.api.v1 import ingest, dashboard, users, auth, health, garmin, preferenc
 
 # Run database migrations before creating tables
 from migrations.add_sleep_stage_columns import migrate as migrate_sleep_stages
+from migrations.add_mail_for_notification import migrate as migrate_mail_notification
 
 print("Running database migrations...")
 migrate_sleep_stages()
+migrate_mail_notification()
 print("Migrations completed.")
 
 # Create database tables

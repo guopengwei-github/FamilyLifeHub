@@ -44,6 +44,39 @@ export default function SettingsPage() {
               </Link>
             </div>
 
+            {/* Notifications */}
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">Notifications</h2>
+
+              <Link
+                href="/settings/email"
+                className="block p-4 rounded-lg border hover:bg-accent transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
+                    <svg
+                      className="h-5 w-5 text-orange-600 dark:text-orange-400"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect width="20" height="16" x="2" y="4" rx="2" />
+                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-medium">Email Settings</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Configure SMTP and notification recipients
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
             {/* Account Settings */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">Account</h2>
