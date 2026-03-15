@@ -17,6 +17,7 @@ from app.models import User, HealthReport, GarminConnection
 from app.services.llm.zhipu import ZhipuProvider
 from app.services.report_generator import generate_morning_report, generate_evening_report
 from app.services import garmin as garmin_service
+from app.services.email_service import EmailService
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -27,9 +28,9 @@ scheduler: Optional[AsyncIOScheduler] = None
 def get_llm_provider() -> ZhipuProvider:
     """Get configured LLM provider."""
     return ZhipuProvider(
-        api_key=settings.ZHIPU_API_KEY,
-        model=settings.ZHIPU_MODEL,
-        base_url=settings.ZHIPU_BASE_URL
+        api_key=settings.zhipu_api_key,
+        model=settings.zhipu_model,
+        base_url=settings.zhipu_base_url
     )
 
 
@@ -120,6 +121,22 @@ async def generate_morning_reports_job():
 
                 logger.info(f"Generated morning report for user {user.id}")
 
+                # Send email notification
+                try:
+                    success, message = EmailService.send_report_notification(
+                        db=db,
+                        user_id=user.id,
+                        report_type='morning',
+                        report_date=str(today),
+                        report_content=report_data['content']
+                    )
+                    if success:
+                        logger.info(f"Morning report email sent to user {user.id}")
+                    else:
+                        logger.warning(f"Failed to send morning report email to user {user.id}: {message}")
+                except Exception as e:
+                    logger.error(f"Error sending morning report email to user {user.id}: {e}")
+
             except Exception as e:
                 logger.error(f"Failed to generate morning report for user {user.id}: {e}")
                 db.rollback()
@@ -180,6 +197,22 @@ async def generate_evening_reports_job():
                 db.commit()
 
                 logger.info(f"Generated evening report for user {user.id}")
+
+                # Send email notification
+                try:
+                    success, message = EmailService.send_report_notification(
+                        db=db,
+                        user_id=user.id,
+                        report_type='evening',
+                        report_date=str(today),
+                        report_content=report_data['content']
+                    )
+                    if success:
+                        logger.info(f"Evening report email sent to user {user.id}")
+                    else:
+                        logger.warning(f"Failed to send evening report email to user {user.id}: {message}")
+                except Exception as e:
+                    logger.error(f"Error sending evening report email to user {user.id}: {e}")
 
             except Exception as e:
                 logger.error(f"Failed to generate evening report for user {user.id}: {e}")
