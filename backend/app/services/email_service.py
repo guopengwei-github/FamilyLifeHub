@@ -6,6 +6,7 @@ import smtplib
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formatdate
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 
@@ -46,6 +47,7 @@ class EmailService:
             msg['Subject'] = subject
             msg['From'] = f"{smtp_config.sender_name or smtp_config.smtp_user} <{smtp_config.sender_email or smtp_config.smtp_user}>"
             msg['To'] = to_email
+            msg['Date'] = formatdate(localtime=True)
 
             # Add plain text part if provided
             if text_content:
