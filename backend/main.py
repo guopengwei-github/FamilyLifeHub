@@ -60,6 +60,7 @@ app.include_router(timeseries.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(smtp_config.router, prefix="/api/v1")
 app.include_router(scheduler_logs.router, prefix="/api/v1")
+app.include_router(agent.router, prefix="/api/v1")
 
 
 @app.on_event("startup")
