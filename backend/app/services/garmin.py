@@ -700,8 +700,9 @@ def fetch_daily_activities(client: Client, target_date: date) -> List[Dict[str, 
     """
     try:
         date_str = target_date.strftime('%Y-%m-%d')
+        # Use activitylist-service endpoint (same as garminconnect library)
         activities = client.connectapi(
-            f"/activity-service/activity/list?startDate={date_str}&endDate={date_str}"
+            f"/activitylist-service/activities/search/activities?startDate={date_str}&endDate={date_str}"
         )
         logger.debug(f"Activities for {date_str}: count={len(activities) if activities else 0}")
         return activities if activities else []

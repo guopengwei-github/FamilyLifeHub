@@ -329,11 +329,20 @@ async def verify_agent_api_key(api_key: str = Security(agent_api_key_header)) ->
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing Agent API Key in X-Agent-API-Key header"
         )
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     if api_key != AGENT_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid Agent API Key"
         )
+<<<<<<< Updated upstream
     
     return True
+=======
+
+    return api_key
+>>>>>>> Stashed changes

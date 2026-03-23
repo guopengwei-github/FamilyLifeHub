@@ -300,7 +300,7 @@ class GarminActivityResponse(BaseModel):
     activity_type: Optional[str] = None
     activity_type_key: Optional[str] = None
     name: Optional[str] = None
-    duration_seconds: Optional[int] = None
+    duration_seconds: Optional[float] = None
     distance_meters: Optional[float] = None
     calories: Optional[float] = None
     average_heartrate: Optional[float] = None

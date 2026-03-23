@@ -171,7 +171,7 @@ class GarminActivity(Base):
     activity_type = Column(String(50), nullable=True)  # RUNNING, CYCLING, etc.
     activity_type_key = Column(String(50), nullable=True)  # Garmin's type key
     name = Column(String(255), nullable=True)
-    duration_seconds = Column(Integer, nullable=True)
+    duration_seconds = Column(Float, nullable=True)
     distance_meters = Column(Float, nullable=True)
     calories = Column(Float, nullable=True)
     average_heartrate = Column(Float, nullable=True)
