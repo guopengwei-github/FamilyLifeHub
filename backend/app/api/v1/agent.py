@@ -129,6 +129,13 @@ async def _generate_user_report(
                 llm_provider=llm_provider
             )
         
+        # Delete existing report if any
+        db.query(HealthReport).filter(
+            HealthReport.user_id == user_id,
+            HealthReport.report_date == report_date,
+            HealthReport.report_type == report_type
+        ).delete()
+        
         # Save report to database
         report = HealthReport(
             user_id=user_id,
