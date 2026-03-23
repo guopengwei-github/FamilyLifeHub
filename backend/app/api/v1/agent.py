@@ -129,6 +129,21 @@ async def _generate_user_report(
                 llm_provider=llm_provider
             )
         
+        # Save report to database
+        report = HealthReport(
+            user_id=user_id,
+            report_date=report_date,
+            report_type=report_type,
+            content=report_data["content"],
+            input_context=report_data.get("input_context", ""),
+            llm_model=report_data.get("llm_model", "glm-4")
+        )
+        db.add(report)
+        db.commit()
+        db.refresh(report)
+        
+        logger.info(f"Saved {report_type} report for user {user_id} on {report_date}")
+        
         return {
             "success": True,
             "user_id": user_id,
