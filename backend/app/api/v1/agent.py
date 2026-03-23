@@ -267,6 +267,7 @@ async def _execute_morning_workflow(user_ids: Optional[List[int]] = None) -> Dic
                     email_result = await _send_user_email(
                         user_id=user.id,
                         report_type="morning",
+                        custom_content=None,
                         db=db
                     )
                     results["emails"].append(email_result)
@@ -319,6 +320,7 @@ async def _execute_evening_workflow(user_ids: Optional[List[int]] = None) -> Dic
                     email_result = await _send_user_email(
                         user_id=user.id,
                         report_type="evening",
+                        custom_content=None,
                         db=db
                     )
                     results["emails"].append(email_result)
