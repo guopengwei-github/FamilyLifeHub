@@ -1137,9 +1137,6 @@ def refresh_garmin_data(
         if not connection:
             raise GarminAuthError("No Garmin connection found for user")
 
-        if connection.sync_status != "connected":
-            raise GarminAuthError(f"Garmin connection not active: {connection.sync_status}")
-
         # Decrypt credentials
         username = decrypt_token(connection.garmin_username)
         password = decrypt_token(connection.garmin_password)
@@ -1168,6 +1165,10 @@ def refresh_garmin_data(
                             if profile:
                                 tokens_used = True
                                 logger.info("Stored OAuth tokens verified and working")
+                                # Update sync_status since tokens are valid
+                                connection.sync_status = "connected"
+                                connection.last_error = None
+                                db.commit()
                             else:
                                 logger.warning("Token verification returned empty profile")
                         except Exception as verify_err:
@@ -1194,6 +1195,8 @@ def refresh_garmin_data(
                 if new_oauth_tokens:
                     encrypted_tokens = encrypt_token(new_oauth_tokens)
                     connection.garmin_oauth_tokens = encrypted_tokens
+                    connection.sync_status = "connected"
+                    connection.last_error = None
                     db.commit()
                     logger.info("Stored new OAuth tokens after successful login")
             except Exception as e:
