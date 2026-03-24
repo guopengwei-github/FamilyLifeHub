@@ -216,7 +216,12 @@ async def generate_evening_reports_job():
         for user in users:
             try:
                 # Sync Garmin data first
-                sync_garmin_data_for_user(db, user.id)
+                sync_success, _ = sync_garmin_data_for_user(db, user.id)
+
+                # 如果同步失败，直接中断，不继续处理
+                if not sync_success:
+                    logger.error(f"Garmin sync failed for user {user.id}, skipping evening report generation")
+                    continue
 
                 # Check if report already exists
                 existing = db.query(HealthReport).filter(
@@ -225,9 +230,11 @@ async def generate_evening_reports_job():
                     HealthReport.report_type == 'evening'
                 ).first()
 
+                # 如果已存在，删除并重新生成
                 if existing:
-                    logger.info(f"Evening report already exists for user {user.id}")
-                    continue
+                    logger.info(f"Evening report already exists for user {user.id}, deleting and regenerating")
+                    db.delete(existing)
+                    db.commit()
 
                 # Generate report
                 report_data = await generate_evening_report(
