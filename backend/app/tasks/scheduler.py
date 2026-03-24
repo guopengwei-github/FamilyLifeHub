@@ -72,8 +72,8 @@ def sync_garmin_data_for_user(db: Session, user_id: int) -> Tuple[bool, bool]:
             
             sleep_data = db.query(HealthMetric).filter(
                 HealthMetric.user_id == user_id,
-                HealthMetric.metric_date == yesterday,
-                HealthMetric.sleep_duration.isnot(None)
+                HealthMetric.date == yesterday,
+                HealthMetric.sleep_hours.isnot(None)
             ).first()
             
             has_sleep = sleep_data is not None
