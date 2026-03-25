@@ -67,18 +67,20 @@ def sync_garmin_data_for_user(db: Session, user_id: int) -> Tuple[bool, bool]:
             logger.info(f"Garmin sync completed for user {user_id}: {results['metrics_created']} created, {results['metrics_updated']} updated")
             
             # 检查是否有睡眠数据
+            # 注意：Garmin 将昨晚的睡眠数据存储在今天的日期下
             from app.models import HealthMetric
-            from datetime import date, timedelta
-            yesterday = date.today() - timedelta(days=1)
+            from datetime import date
+            
+            today = date.today()
             
             sleep_data = db.query(HealthMetric).filter(
                 HealthMetric.user_id == user_id,
-                HealthMetric.date == yesterday,
+                HealthMetric.date == today,
                 HealthMetric.sleep_hours.isnot(None)
             ).first()
             
             has_sleep = sleep_data is not None
-            logger.info(f"Sleep data for yesterday: {'found' if has_sleep else 'not found'}")
+            logger.info(f"Sleep data for last night: {'found' if has_sleep else 'not found'}")
             
             return True, has_sleep
         else:

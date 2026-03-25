@@ -91,13 +91,16 @@ def _get_user_profile(user: User | None) -> dict | None:
 
 
 def _get_sleep_data(db: Session, user_id: int, report_date: date) -> dict | None:
-    """Get sleep data for last night and 7-day trend."""
-    yesterday = report_date - timedelta(days=1)
-
-    # Last night's sleep
+    """Get sleep data for last night and 7-day trend.
+    
+    Note: Garmin dailySleepData API returns previous night's sleep when querying a date.
+    So date=2026-03-25 contains sleep from the night of 3/24 (last night).
+    We query report_date directly, not yesterday.
+    """
+    # Last night's sleep (Garmin stores it under today's date)
     last_night_metric = db.query(HealthMetric).filter(
         HealthMetric.user_id == user_id,
-        HealthMetric.date == yesterday
+        HealthMetric.date == report_date
     ).first()
 
     last_night = None
@@ -128,13 +131,14 @@ def _get_sleep_data(db: Session, user_id: int, report_date: date) -> dict | None
 
 
 def _get_hrv_data(db: Session, user_id: int, report_date: date) -> dict | None:
-    """Get HRV data with trends."""
-    yesterday = report_date - timedelta(days=1)
-
-    # Last night's HRV
+    """Get HRV data with trends.
+    
+    Note: Garmin stores last night's HRV under today's date.
+    """
+    # Last night's HRV (stored under today's date)
     last_night_metric = db.query(HealthMetric).filter(
         HealthMetric.user_id == user_id,
-        HealthMetric.date == yesterday
+        HealthMetric.date == report_date
     ).first()
 
     # 7-day average
@@ -193,13 +197,14 @@ def _get_morning_body_battery(db: Session, user_id: int, report_date: date) -> d
 
 
 def _get_sleep_period_metrics(db: Session, user_id: int, report_date: date) -> dict | None:
-    """Get sleep period metrics: SpO2, respiration rate, and stress during sleep."""
-    # 睡眠数据记录在前一天
-    yesterday = report_date - timedelta(days=1)
-
+    """Get sleep period metrics: SpO2, respiration rate, and stress during sleep.
+    
+    Note: Garmin stores last night's sleep metrics under today's date.
+    """
+    # Last night's sleep period metrics (stored under today's date)
     metric = db.query(HealthMetric).filter(
         HealthMetric.user_id == user_id,
-        HealthMetric.date == yesterday
+        HealthMetric.date == report_date
     ).first()
 
     if not metric:
