@@ -3,12 +3,12 @@ Data aggregator for health report generation.
 
 Collects and formats Garmin health data for morning and evening reports.
 """
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import User, HealthMetric, BodyStatusTimeseries
+from app.models import User, HealthMetric, BodyStatusTimeseries, GarminActivity
 
 
 def aggregate_morning_report_data(
@@ -70,7 +70,11 @@ def aggregate_evening_report_data(
         'body_battery': _get_evening_body_battery(db, user_id, report_date),
         'activity_data': _get_today_activity_data(db, user_id, report_date),
         'user_profile': _get_user_profile(user),
-        'resting_hr': resting_hr
+        'resting_hr': resting_hr,
+        # 新增数据源
+        'workout_data': _get_workout_data(db, user_id, report_date),
+        'heart_rate_zones': _get_heart_rate_zones(db, user_id, report_date, user),
+        'energy_curve': _get_energy_curve_analysis(db, user_id, report_date)
     }
 
 
@@ -405,4 +409,282 @@ def _get_today_activity_data(db: Session, user_id: int, report_date: date) -> di
     return {
         'today': today,
         'avg_7d': avg_7d
+    }
+
+
+# ============ 新增数据聚合函数（晚间报告增强） ============
+
+def _get_workout_data(db: Session, user_id: int, report_date: date) -> dict | None:
+    """获取今日运动详情
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        report_date: 报告日期
+    
+    Returns:
+        包含运动列表的字典，或 None
+    """
+    activities = db.query(GarminActivity).filter(
+        GarminActivity.user_id == user_id,
+        GarminActivity.date == report_date
+    ).order_by(GarminActivity.start_time_local).all()
+    
+    if not activities:
+        return None
+    
+    workout_list = []
+    for act in activities:
+        workout = {
+            'time': act.start_time_local.strftime('%H:%M') if act.start_time_local else 'N/A',
+            'type': _activity_type_cn(act.activity_type or act.activity_type_key),
+            'duration_min': round(act.duration_seconds / 60) if act.duration_seconds else None,
+            'distance_km': round(act.distance_meters / 1000, 1) if act.distance_meters else None,
+            'calories': int(act.calories) if act.calories else None,
+            'avg_hr': int(act.average_heartrate) if act.average_heartrate else None,
+            'max_hr': int(act.max_heartrate) if act.max_heartrate else None,
+        }
+        workout_list.append(workout)
+    
+    return {'workouts': workout_list}
+
+
+def _activity_type_cn(type_key: str | None) -> str:
+    """运动类型转中文名
+    
+    Args:
+        type_key: Garmin 运动类型键
+    
+    Returns:
+        中文名称
+    """
+    if not type_key:
+        return '未知'
+    
+    mapping = {
+        'running': '跑步',
+        'cycling': '骑行',
+        'swimming': '游泳',
+        'strength_training': '力量训练',
+        'weight_training': '力量训练',
+        'yoga': '瑜伽',
+        'walking': '步行',
+        'hiking': '徒步',
+        'elliptical': '椭圆机',
+        'treadmill_running': '跑步机',
+        'indoor_cardio': '室内有氧',
+        'cardio': '有氧运动',
+        'fitness_equipment': '健身器材',
+        'crossfit': 'CrossFit',
+        'rower': '划船机',
+        'stair_climbing': '爬楼梯',
+        'indoor_rowing': '室内划船',
+    }
+    
+    return mapping.get(type_key.lower(), type_key)
+
+
+def _get_heart_rate_zones(
+    db: Session, 
+    user_id: int, 
+    report_date: date,
+    user: User | None
+) -> dict | None:
+    """获取心率区间分布
+    
+    基于时间序列数据计算心率区间分布（分钟数）
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        report_date: 报告日期
+        user: User 对象（用于获取年龄计算最大心率）
+    
+    Returns:
+        心率区间分布字典，或 None
+    """
+    next_date = report_date + timedelta(days=1)
+    data = db.query(BodyStatusTimeseries).filter(
+        BodyStatusTimeseries.user_id == user_id,
+        BodyStatusTimeseries.timestamp >= report_date,
+        BodyStatusTimeseries.timestamp < next_date,
+        BodyStatusTimeseries.heart_rate.isnot(None)
+    ).all()
+    
+    if not data or len(data) < 10:
+        return None
+    
+    # 计算最大心率：220 - 年龄（如果没有年龄，默认30岁）
+    age = user.age if user and user.age else 30
+    max_hr = 220 - age
+    
+    # 心率区间阈值
+    zones = {
+        'rest': 0,       # <60% 最大心率
+        'fat_burn': 0,   # 60-70%
+        'aerobic': 0,    # 70-80%
+        'anaerobic': 0,  # 80-90%
+        'extreme': 0     # >90%
+    }
+    
+    zone_thresholds = {
+        'rest': max_hr * 0.6,
+        'fat_burn': max_hr * 0.7,
+        'aerobic': max_hr * 0.8,
+        'anaerobic': max_hr * 0.9,
+    }
+    
+    for d in data:
+        if d.heart_rate:
+            hr = d.heart_rate
+            if hr < zone_thresholds['rest']:
+                zones['rest'] += 1
+            elif hr < zone_thresholds['fat_burn']:
+                zones['fat_burn'] += 1
+            elif hr < zone_thresholds['aerobic']:
+                zones['aerobic'] += 1
+            elif hr < zone_thresholds['anaerobic']:
+                zones['anaerobic'] += 1
+            else:
+                zones['extreme'] += 1
+    
+    # 转换为分钟（每条记录约3分钟）
+    total_records = sum(zones.values())
+    if total_records == 0:
+        return None
+    
+    zone_minutes = {k: round(v * 3 / 60) for k, v in zones.items()}
+    zone_percentages = {k: round(v / total_records * 100, 1) for k, v in zones.items()}
+    
+    return {
+        'zones': zone_minutes,
+        'percentages': zone_percentages,
+        'max_hr': max_hr,
+        'zone_thresholds': {
+            'rest': f"<{int(zone_thresholds['rest'])} bpm",
+            'fat_burn': f"{int(zone_thresholds['rest'])}-{int(zone_thresholds['fat_burn'])} bpm",
+            'aerobic': f"{int(zone_thresholds['fat_burn'])}-{int(zone_thresholds['aerobic'])} bpm",
+            'anaerobic': f"{int(zone_thresholds['aerobic'])}-{int(zone_thresholds['anaerobic'])} bpm",
+            'extreme': f">{int(zone_thresholds['anaerobic'])} bpm",
+        }
+    }
+
+
+def _get_energy_curve_analysis(db: Session, user_id: int, report_date: date) -> dict | None:
+    """分析身体电量曲线
+    
+    识别全天关键时段、精力低谷、快速消耗时段
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        report_date: 报告日期
+    
+    Returns:
+        能量曲线分析字典，或 None
+    """
+    next_date = report_date + timedelta(days=1)
+    data = db.query(BodyStatusTimeseries).filter(
+        BodyStatusTimeseries.user_id == user_id,
+        BodyStatusTimeseries.timestamp >= report_date,
+        BodyStatusTimeseries.timestamp < next_date,
+        BodyStatusTimeseries.body_battery.isnot(None)
+    ).order_by(BodyStatusTimeseries.timestamp).all()
+    
+    if not data or len(data) < 10:
+        return None
+    
+    # 按小时分组分析
+    segments = []
+    current_hour = None
+    hour_data = []
+    
+    for d in data:
+        hour = d.timestamp.hour
+        if current_hour is None:
+            current_hour = hour
+            hour_data = [d]
+        elif hour == current_hour:
+            hour_data.append(d)
+        else:
+            # 处理上一小时的数据
+            if len(hour_data) >= 2:
+                segment = _analyze_hour_segment(hour_data)
+                if segment:
+                    segments.append(segment)
+            current_hour = hour
+            hour_data = [d]
+    
+    # 处理最后一小时
+    if len(hour_data) >= 2:
+        segment = _analyze_hour_segment(hour_data)
+        if segment:
+            segments.append(segment)
+    
+    # 找出最低点和快速消耗时段
+    bb_values = [(d.body_battery, d.timestamp) for d in data if d.body_battery is not None]
+    if not bb_values:
+        return None
+    
+    min_bb = min(bb_values, key=lambda x: x[0])
+    max_drop_segment = min(segments, key=lambda x: x['bb_change']) if segments else None
+    
+    # 识别精力低谷时段（电量 < 30）
+    low_energy_periods = []
+    for seg in segments:
+        if seg['end_bb'] is not None and seg['end_bb'] < 30:
+            low_energy_periods.append({
+                'time': seg['time_range'],
+                'value': seg['end_bb']
+            })
+    
+    return {
+        'segments': segments,
+        'lowest_point': {
+            'time': min_bb[1].strftime('%H:%M'),
+            'value': min_bb[0]
+        },
+        'fastest_drop': max_drop_segment,
+        'low_energy_periods': low_energy_periods
+    }
+
+
+def _analyze_hour_segment(hour_data: list) -> dict | None:
+    """分析一小时的电量变化
+    
+    Args:
+        hour_data: 一小时内的 BodyStatusTimeseries 记录列表
+    
+    Returns:
+        时段分析字典，或 None
+    """
+    if not hour_data or len(hour_data) < 2:
+        return None
+    
+    first = hour_data[0]
+    last = hour_data[-1]
+    
+    start_bb = first.body_battery
+    end_bb = last.body_battery
+    
+    if start_bb is None or end_bb is None:
+        return None
+    
+    bb_change = end_bb - start_bb
+    
+    # 计算平均压力
+    stress_values = [d.stress_level for d in hour_data if d.stress_level is not None]
+    avg_stress = round(sum(stress_values) / len(stress_values)) if stress_values else None
+    
+    # 计算平均心率
+    hr_values = [d.heart_rate for d in hour_data if d.heart_rate is not None]
+    avg_hr = round(sum(hr_values) / len(hr_values)) if hr_values else None
+    
+    return {
+        'time_range': f"{first.timestamp.strftime('%H:%M')}-{last.timestamp.strftime('%H:%M')}",
+        'start_bb': start_bb,
+        'end_bb': end_bb,
+        'bb_change': bb_change,
+        'avg_stress': avg_stress,
+        'avg_hr': avg_hr,
     }

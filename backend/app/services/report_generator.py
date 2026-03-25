@@ -93,7 +93,7 @@ async def generate_evening_report(
     # Aggregate data
     data = aggregate_evening_report_data(db, user_id, report_date)
 
-    # Format prompt
+    # Format prompt (新增参数)
     prompt = format_evening_report_prompt(
         report_date=report_date,
         heart_rate_data=data['heart_rate_data'],
@@ -101,7 +101,11 @@ async def generate_evening_report(
         body_battery=data['body_battery'],
         activity_data=data['activity_data'],
         user_profile=data['user_profile'],
-        resting_hr=data.get('resting_hr')
+        resting_hr=data.get('resting_hr'),
+        # 新增数据源
+        workout_data=data.get('workout_data'),
+        heart_rate_zones=data.get('heart_rate_zones'),
+        energy_curve=data.get('energy_curve')
     )
 
     # Generate report
