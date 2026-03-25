@@ -45,13 +45,14 @@ def sync_garmin_data_for_user(db: Session, user_id: int) -> Tuple[bool, bool]:
         - sync_success: True if sync was successful or no Garmin connection exists
         - has_sleep_data: True if sleep data was found for yesterday
     """
+    # 不再检查 sync_status，让 refresh_garmin_data 尝试使用存储的 OAuth token
+    # PR #9 已优化：OAuth token 验证成功后会自动更新 sync_status 为 connected
     connection = db.query(GarminConnection).filter(
-        GarminConnection.user_id == user_id,
-        GarminConnection.sync_status == "connected"
+        GarminConnection.user_id == user_id
     ).first()
 
     if not connection:
-        logger.info(f"No active Garmin connection for user {user_id}, skipping sync")
+        logger.info(f"No Garmin connection for user {user_id}, skipping sync")
         return True, False
 
     try:
