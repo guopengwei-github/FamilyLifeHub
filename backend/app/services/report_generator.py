@@ -44,7 +44,7 @@ async def generate_morning_report(
     # Aggregate data
     data = aggregate_morning_report_data(db, user_id, report_date)
 
-    # Format prompt
+    # Format prompt (新增参数)
     prompt = format_morning_report_prompt(
         report_date=report_date,
         sleep_data=data['sleep_data'],
@@ -52,7 +52,12 @@ async def generate_morning_report(
         body_battery=data['body_battery'],
         activity_data=data['activity_data'],
         user_profile=data['user_profile'],
-        sleep_metrics=data.get('sleep_metrics')
+        sleep_metrics=data.get('sleep_metrics'),
+        # 新增数据源
+        sleep_charging_efficiency=data.get('sleep_charging_efficiency'),
+        sleep_structure=data.get('sleep_structure'),
+        recovery_quality=data.get('recovery_quality'),
+        yesterday_workout=data.get('yesterday_workout')
     )
 
     # Generate report

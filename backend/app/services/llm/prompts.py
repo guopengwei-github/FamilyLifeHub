@@ -69,11 +69,35 @@ MORNING_REPORT_SYSTEM_PROMPT = """你是一位专业的健康与精力管理顾�
 ## 系统恢复评估
 分析昨晚的睡眠质量、HRV 水平和今晨身体电量，评估用户的恢复状态。
 
+## 睡眠充电效率
+分析睡眠期间的充电效率：
+- 睡眠时长与充电量
+- 每小时充电速率
+- 与 7 日平均对比
+
+## 睡眠结构分析
+分析睡眠结构是否健康：
+- 深睡/浅睡/REM 比例
+- 与理想比例对比
+- 睡眠结构问题提示
+
+## 恢复质量评分
+综合评估恢复质量（0-100分）：
+- 睡眠评分
+- HRV 状态
+- 身体电量充电
+- 静息心率变化
+
+## 昨日运动影响
+分析昨天运动对睡眠的影响：
+- 运动类型、时长、强度
+- 运动与睡眠质量的关联
+
 ## 今日安排建议
 基于恢复状态，给出今日的工作、午睡、脑力活动建议：
-- 🎯 重点任务时段建议
-- 😴 午休建议（是否需要、最佳时长）
-- 🧠 脑力活动强度建议
+- 重点任务时段建议
+- 午休建议（是否需要、最佳时长）
+- 脑力活动强度建议
 
 ## 今日运动处方
 根据身体状态，推荐今日的运动类型和强度。
@@ -82,6 +106,7 @@ MORNING_REPORT_SYSTEM_PROMPT = """你是一位专业的健康与精力管理顾�
 - 使用客观、专业的语气
 - 建议要具体、可操作
 - 如果数据异常，提醒用户关注
+- 结合昨日运动分析恢复效果
 """
 
 # System prompt for evening review report
@@ -131,7 +156,12 @@ def format_morning_report_prompt(
     body_battery: dict | None,
     activity_data: dict | None,
     user_profile: dict | None = None,
-    sleep_metrics: dict | None = None
+    sleep_metrics: dict | None = None,
+    # 新增数据源
+    sleep_charging_efficiency: dict | None = None,
+    sleep_structure: dict | None = None,
+    recovery_quality: dict | None = None,
+    yesterday_workout: dict | None = None
 ) -> str:
     """
     Format the morning report prompt with user data.
@@ -144,6 +174,10 @@ def format_morning_report_prompt(
         activity_data: Past 3 days of exercise data.
         user_profile: Optional user profile (age, gender, weight).
         sleep_metrics: Sleep period metrics (spo2, respiration_rate, stress_level, resting_hr).
+        sleep_charging_efficiency: 睡眠充电效率（新增）
+        sleep_structure: 睡眠结构分析（新增）
+        recovery_quality: 恢复质量评分（新增）
+        yesterday_workout: 昨日运动数据（新增）
 
     Returns:
         Formatted prompt string.
@@ -183,7 +217,7 @@ def format_morning_report_prompt(
             sections.append(f"- 7日平均: {t7.get('avg_sleep_hours', 'N/A')}小时")
         sections.append("")
 
-    # Sleep period recovery metrics (NEW)
+    # Sleep period recovery metrics
     if sleep_metrics or hrv_data:
         sections.append("## 睡眠期间恢复指标")
         if hrv_data:
@@ -207,7 +241,7 @@ def format_morning_report_prompt(
                 sections.append(f"- 睡眠期间压力: {sleep_metrics['stress_level']}")
         sections.append("")
 
-    # Body battery (enhanced format)
+    # Body battery
     if body_battery:
         sections.append("## 身体电量")
         if body_battery.get('before_sleep') is not None and body_battery.get('after_sleep') is not None:
@@ -218,7 +252,88 @@ def format_morning_report_prompt(
             sections.append(f"- 今晨起始值: {body_battery['morning_value']}")
         sections.append("")
 
-    # Activity data
+    # 睡眠充电效率 (NEW)
+    if sleep_charging_efficiency:
+        sections.append("## 睡眠充电效率")
+        sce = sleep_charging_efficiency
+        sections.append(f"- 睡眠时长: {sce.get('sleep_hours', 'N/A')}小时")
+        sections.append(f"- 充电量: +{sce.get('charged', 'N/A')}点")
+        sections.append(f"- 充电速率: {sce.get('charge_rate', 'N/A')}点/小时")
+        sections.append(f"- 效率评估: {sce.get('efficiency', 'N/A')}")
+        if sce.get('avg_7d_charge_rate'):
+            sections.append(f"- 7日平均充电速率: {sce['avg_7d_charge_rate']}点/小时")
+        sections.append("")
+
+    # 睡眠结构分析 (NEW)
+    if sleep_structure:
+        sections.append("## 睡眠结构分析")
+        ss = sleep_structure
+        sections.append(f"- 总睡眠: {ss.get('total_sleep_hours', 'N/A')}小时")
+        sections.append("")
+        sections.append("| 阶段 | 时长 | 占比 | 理想范围 |")
+        sections.append("|------|------|------|----------|")
+        
+        ideal = ss.get('ideal_ranges', {})
+        deep = ss.get('deep_sleep', {})
+        light = ss.get('light_sleep', {})
+        rem = ss.get('rem_sleep', {})
+        
+        sections.append(f"| 深睡 | {deep.get('hours', 'N/A')}小时 | {deep.get('percentage', 'N/A')}% | {ideal.get('deep', 'N/A')} |")
+        sections.append(f"| 浅睡 | {light.get('hours', 'N/A')}小时 | {light.get('percentage', 'N/A')}% | {ideal.get('light', 'N/A')} |")
+        sections.append(f"| REM | {rem.get('hours', 'N/A')}小时 | {rem.get('percentage', 'N/A')}% | {ideal.get('rem', 'N/A')} |")
+        sections.append("")
+        
+        if ss.get('structure_quality'):
+            sections.append(f"- **结构评估**: {', '.join(ss['structure_quality'])}")
+            sections.append("")
+
+    # 恢复质量评分 (NEW)
+    if recovery_quality:
+        sections.append("## 恢复质量评分")
+        rq = recovery_quality
+        sections.append(f"- **综合评分**: {rq.get('overall_score', 'N/A')}分")
+        sections.append(f"- **恢复等级**: {rq.get('recovery_level', 'N/A')}")
+        sections.append("")
+        
+        if rq.get('components'):
+            sections.append("### 评分组成")
+            comp = rq['components']
+            if 'sleep' in comp:
+                sections.append(f"- 睡眠评分: {comp['sleep']}分 (权重30%)")
+            if 'hrv' in comp:
+                sections.append(f"- HRV评分: {comp['hrv']}分 (权重25%)")
+            if 'body_battery' in comp:
+                sections.append(f"- 充电评分: {comp['body_battery']}分 (权重25%)")
+            if 'resting_hr' in comp:
+                sections.append(f"- 静息心率评分: {comp['resting_hr']}分 (权重20%)")
+            sections.append("")
+
+    # 昨日运动影响 (NEW)
+    if yesterday_workout:
+        sections.append("## 昨日运动记录")
+        yw = yesterday_workout
+        sections.append(f"- 日期: {yw.get('date', 'N/A')}")
+        sections.append(f"- 运动次数: {yw.get('workout_count', 'N/A')}次")
+        sections.append(f"- 总时长: {yw.get('total_duration_min', 'N/A')}分钟")
+        sections.append(f"- 总消耗: {yw.get('total_calories', 'N/A')}kcal")
+        sections.append("")
+        
+        if yw.get('workouts'):
+            sections.append("### 运动详情")
+            sections.append("| 时间 | 类型 | 时长 | 卡路里 | 平均心率 |")
+            sections.append("|------|------|------|--------|----------|")
+            
+            for w in yw['workouts']:
+                time_str = w.get('time', 'N/A')
+                type_str = w.get('type', 'N/A')
+                duration = f"{w.get('duration_min', 0)}分钟"
+                calories = f"{w.get('calories', 0)}kcal"
+                avg_hr = f"{w.get('avg_hr', '-')} bpm" if w.get('avg_hr') else '-'
+                
+                sections.append(f"| {time_str} | {type_str} | {duration} | {calories} | {avg_hr} |")
+            sections.append("")
+
+    # Activity data (past 3 days)
     if activity_data:
         sections.append("## 近期活动 (过去3天)")
         for day in activity_data.get('days', []):

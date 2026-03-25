@@ -53,7 +53,12 @@ def aggregate_morning_report_data(
         'body_battery': _get_morning_body_battery(db, user_id, report_date),
         'sleep_metrics': _get_sleep_period_metrics(db, user_id, report_date),
         'activity_data': _get_recent_activity_data(db, user_id, report_date),
-        'user_profile': _get_user_profile(user)
+        'user_profile': _get_user_profile(user),
+        # 新增数据源
+        'sleep_charging_efficiency': _get_sleep_charging_efficiency(db, user_id, report_date),
+        'sleep_structure': _get_sleep_structure_analysis(db, user_id, report_date),
+        'recovery_quality': _get_recovery_quality_score(db, user_id, report_date),
+        'yesterday_workout': _get_yesterday_workout_data(db, user_id, report_date)
     }
 
 
@@ -728,4 +733,293 @@ def _analyze_hour_segment(hour_data: list) -> dict | None:
         'bb_change': bb_change,
         'avg_stress': avg_stress,
         'avg_hr': avg_hr,
+    }
+
+
+# ============ 新增数据聚合函数（早报增强） ============
+
+def _get_sleep_charging_efficiency(db: Session, user_id: int, report_date: date) -> dict | None:
+    """计算睡眠充电效率
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        report_date: 报告日期
+    
+    Returns:
+        睡眠充电效率字典，或 None
+    """
+    metric = db.query(HealthMetric).filter(
+        HealthMetric.user_id == user_id,
+        HealthMetric.date == report_date
+    ).first()
+    
+    if not metric:
+        return None
+    
+    # 获取睡眠时长和充电量
+    sleep_hours = metric.sleep_hours
+    before_sleep = metric.body_battery_before_sleep
+    after_sleep = metric.body_battery
+    
+    if sleep_hours is None or before_sleep is None or after_sleep is None:
+        return None
+    
+    charged = after_sleep - before_sleep
+    
+    # 计算每小时充电速率
+    charge_rate = round(charged / sleep_hours, 1) if sleep_hours > 0 else 0
+    
+    # 评估充电效率
+    # 正常：每小时充电 8-12 点
+    # 高效：每小时充电 > 12 点
+    # 低效：每小时充电 < 8 点
+    if charge_rate >= 12:
+        efficiency = '高效'
+    elif charge_rate >= 8:
+        efficiency = '正常'
+    else:
+        efficiency = '低效'
+    
+    # 获取 7 日平均充电效率
+    start_date = report_date - timedelta(days=8)
+    past_metrics = db.query(HealthMetric).filter(
+        HealthMetric.user_id == user_id,
+        HealthMetric.date >= start_date,
+        HealthMetric.date < report_date
+    ).all()
+    
+    charge_rates = []
+    for m in past_metrics:
+        if m.sleep_hours and m.body_battery_before_sleep is not None and m.body_battery is not None:
+            past_charged = m.body_battery - m.body_battery_before_sleep
+            if m.sleep_hours > 0:
+                charge_rates.append(past_charged / m.sleep_hours)
+    
+    avg_charge_rate = round(sum(charge_rates) / len(charge_rates), 1) if charge_rates else None
+    
+    return {
+        'sleep_hours': round(sleep_hours, 1),
+        'charged': charged,
+        'charge_rate': charge_rate,  # 每小时充电点数
+        'efficiency': efficiency,
+        'avg_7d_charge_rate': avg_charge_rate
+    }
+
+
+def _get_sleep_structure_analysis(db: Session, user_id: int, report_date: date) -> dict | None:
+    """分析睡眠结构
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        report_date: 报告日期
+    
+    Returns:
+        睡眠结构分析字典，或 None
+    """
+    metric = db.query(HealthMetric).filter(
+        HealthMetric.user_id == user_id,
+        HealthMetric.date == report_date
+    ).first()
+    
+    if not metric or not metric.sleep_hours:
+        return None
+    
+    total_sleep = metric.sleep_hours
+    deep_sleep = metric.deep_sleep_hours or 0
+    light_sleep = metric.light_sleep_hours or 0
+    rem_sleep = metric.rem_sleep_hours or 0
+    
+    # 计算各阶段占比
+    deep_pct = round(deep_sleep / total_sleep * 100, 1) if total_sleep > 0 else 0
+    light_pct = round(light_sleep / total_sleep * 100, 1) if total_sleep > 0 else 0
+    rem_pct = round(rem_sleep / total_sleep * 100, 1) if total_sleep > 0 else 0
+    
+    # 评估睡眠结构（理想比例：深睡 15-25%, 浅睡 50-60%, REM 20-25%）
+    structure_quality = []
+    
+    if deep_pct < 10:
+        structure_quality.append('深睡不足')
+    elif deep_pct > 30:
+        structure_quality.append('深睡过多')
+    
+    if rem_pct < 15:
+        structure_quality.append('REM不足')
+    elif rem_pct > 30:
+        structure_quality.append('REM过多')
+    
+    if not structure_quality:
+        structure_quality.append('睡眠结构正常')
+    
+    return {
+        'total_sleep_hours': round(total_sleep, 1),
+        'deep_sleep': {
+            'hours': round(deep_sleep, 1),
+            'percentage': deep_pct
+        },
+        'light_sleep': {
+            'hours': round(light_sleep, 1),
+            'percentage': light_pct
+        },
+        'rem_sleep': {
+            'hours': round(rem_sleep, 1),
+            'percentage': rem_pct
+        },
+        'structure_quality': structure_quality,
+        'ideal_ranges': {
+            'deep': '15-25%',
+            'light': '50-60%',
+            'rem': '20-25%'
+        }
+    }
+
+
+def _get_recovery_quality_score(db: Session, user_id: int, report_date: date) -> dict | None:
+    """计算恢复质量评分
+    
+    综合评估：睡眠质量、HRV、静息心率、身体电量充电
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        report_date: 报告日期
+    
+    Returns:
+        恢复质量评分字典，或 None
+    """
+    metric = db.query(HealthMetric).filter(
+        HealthMetric.user_id == user_id,
+        HealthMetric.date == report_date
+    ).first()
+    
+    if not metric:
+        return None
+    
+    scores = []
+    
+    # 1. 睡眠评分 (0-100)
+    if metric.sleep_score:
+        scores.append(('sleep', metric.sleep_score, 0.3))  # 权重 30%
+    
+    # 2. HRV 评分 (基于 7 日趋势)
+    if metric.hrv_last_night:
+        # 获取 7 日平均
+        start_date = report_date - timedelta(days=8)
+        past_metrics = db.query(HealthMetric).filter(
+            HealthMetric.user_id == user_id,
+            HealthMetric.date >= start_date,
+            HealthMetric.date < report_date
+        ).all()
+        
+        hrv_values = [m.hrv_last_night for m in past_metrics if m.hrv_last_night]
+        if hrv_values:
+            avg_hrv = sum(hrv_values) / len(hrv_values)
+            # HRV 高于平均 = 恢复好
+            hrv_ratio = metric.hrv_last_night / avg_hrv if avg_hrv > 0 else 1
+            hrv_score = min(100, int(hrv_ratio * 80))  # 80 为基准分
+            scores.append(('hrv', hrv_score, 0.25))  # 权重 25%
+    
+    # 3. 身体电量充电评分
+    if metric.body_battery_before_sleep is not None and metric.body_battery is not None:
+        charged = metric.body_battery - metric.body_battery_before_sleep
+        # 充电 60+ 点 = 优秀, 40-60 = 良好, <40 = 一般
+        if charged >= 60:
+            bb_score = 90
+        elif charged >= 40:
+            bb_score = 70
+        else:
+            bb_score = 50
+        scores.append(('body_battery', bb_score, 0.25))  # 权重 25%
+    
+    # 4. 静息心率评分
+    if metric.resting_hr:
+        # 获取 7 日平均
+        start_date = report_date - timedelta(days=8)
+        past_metrics = db.query(HealthMetric).filter(
+            HealthMetric.user_id == user_id,
+            HealthMetric.date >= start_date,
+            HealthMetric.date < report_date
+        ).all()
+        
+        hr_values = [m.resting_hr for m in past_metrics if m.resting_hr]
+        if hr_values:
+            avg_hr = sum(hr_values) / len(hr_values)
+            # 静息心率低于平均 = 恢复好
+            hr_ratio = avg_hr / metric.resting_hr if metric.resting_hr > 0 else 1
+            hr_score = min(100, int(hr_ratio * 80))
+            scores.append(('resting_hr', hr_score, 0.20))  # 权重 20%
+    
+    # 计算综合评分
+    if not scores:
+        return None
+    
+    total_weight = sum(s[2] for s in scores)
+    weighted_score = sum(s[1] * s[2] for s in scores) / total_weight if total_weight > 0 else 0
+    overall_score = round(weighted_score)
+    
+    # 评估恢复等级
+    if overall_score >= 80:
+        recovery_level = '优秀'
+    elif overall_score >= 60:
+        recovery_level = '良好'
+    elif overall_score >= 40:
+        recovery_level = '一般'
+    else:
+        recovery_level = '较差'
+    
+    return {
+        'overall_score': overall_score,
+        'recovery_level': recovery_level,
+        'components': {s[0]: s[1] for s in scores}
+    }
+
+
+def _get_yesterday_workout_data(db: Session, user_id: int, report_date: date) -> dict | None:
+    """获取昨日运动数据
+    
+    分析昨天运动对睡眠的影响
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        report_date: 报告日期
+    
+    Returns:
+        昨日运动数据字典，或 None
+    """
+    yesterday = report_date - timedelta(days=1)
+    
+    # 获取昨天的运动记录
+    activities = db.query(GarminActivity).filter(
+        GarminActivity.user_id == user_id,
+        GarminActivity.date == yesterday
+    ).order_by(GarminActivity.start_time_local).all()
+    
+    if not activities:
+        return None
+    
+    workout_list = []
+    total_duration = 0
+    total_calories = 0
+    
+    for act in activities:
+        workout = {
+            'type': _activity_type_cn(act.activity_type or act.activity_type_key),
+            'time': act.start_time_local.strftime('%H:%M') if act.start_time_local else 'N/A',
+            'duration_min': round(act.duration_seconds / 60) if act.duration_seconds else 0,
+            'calories': int(act.calories) if act.calories else 0,
+            'avg_hr': int(act.average_heartrate) if act.average_heartrate else None,
+            'max_hr': int(act.max_heartrate) if act.max_heartrate else None,
+        }
+        workout_list.append(workout)
+        total_duration += workout['duration_min']
+        total_calories += workout['calories']
+    
+    return {
+        'date': str(yesterday),
+        'workouts': workout_list,
+        'total_duration_min': total_duration,
+        'total_calories': total_calories,
+        'workout_count': len(workout_list)
     }
