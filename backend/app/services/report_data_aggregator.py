@@ -10,6 +10,24 @@ from sqlalchemy.orm import Session
 
 from app.models import User, HealthMetric, BodyStatusTimeseries, GarminActivity
 
+# 时区偏移（Asia/Shanghai = UTC+8）
+LOCAL_TZ_OFFSET = timedelta(hours=8)
+
+
+def _utc_to_local_range(report_date: date) -> tuple[datetime, datetime]:
+    """将本地日期转换为 UTC 查询范围
+    
+    Args:
+        report_date: 本地日期
+    
+    Returns:
+        (utc_start, utc_end) UTC 时间范围
+    """
+    local_start = datetime.combine(report_date, datetime.min.time())
+    utc_start = local_start - LOCAL_TZ_OFFSET
+    utc_end = utc_start + timedelta(days=1)
+    return utc_start, utc_end
+
 
 def aggregate_morning_report_data(
     db: Session,
@@ -256,10 +274,14 @@ def _get_recent_activity_data(db: Session, user_id: int, report_date: date) -> d
 
 def _get_heart_rate_data(db: Session, user_id: int, report_date: date) -> dict | None:
     """Get heart rate data with 7-day comparison."""
+    # 时区转换
+    utc_start, utc_end = _utc_to_local_range(report_date)
+    
     # Today's HR from timeseries
     today_data = db.query(BodyStatusTimeseries).filter(
         BodyStatusTimeseries.user_id == user_id,
-        BodyStatusTimeseries.timestamp >= report_date
+        BodyStatusTimeseries.timestamp >= utc_start,
+        BodyStatusTimeseries.timestamp < utc_end
     ).all()
 
     today = None
@@ -286,10 +308,14 @@ def _get_heart_rate_data(db: Session, user_id: int, report_date: date) -> dict |
 
 def _get_stress_data(db: Session, user_id: int, report_date: date) -> dict | None:
     """Get stress distribution with 7-day comparison."""
+    # 时区转换
+    utc_start, utc_end = _utc_to_local_range(report_date)
+    
     # Today's stress from timeseries
     today_data = db.query(BodyStatusTimeseries).filter(
         BodyStatusTimeseries.user_id == user_id,
-        BodyStatusTimeseries.timestamp >= report_date
+        BodyStatusTimeseries.timestamp >= utc_start,
+        BodyStatusTimeseries.timestamp < utc_end
     ).all()
 
     today = None
@@ -337,10 +363,14 @@ def _get_evening_body_battery(db: Session, user_id: int, report_date: date) -> d
     if not metric:
         return None
 
+    # 时区转换
+    utc_start, utc_end = _utc_to_local_range(report_date)
+
     # Get timeseries for consumption calculation
     today_data = db.query(BodyStatusTimeseries).filter(
         BodyStatusTimeseries.user_id == user_id,
-        BodyStatusTimeseries.timestamp >= report_date
+        BodyStatusTimeseries.timestamp >= utc_start,
+        BodyStatusTimeseries.timestamp < utc_end
     ).order_by(BodyStatusTimeseries.timestamp).all()
 
     morning_value = None
@@ -497,17 +527,19 @@ def _get_heart_rate_zones(
     Args:
         db: Database session
         user_id: User ID
-        report_date: 报告日期
+        report_date: 报告日期（本地时间）
         user: User 对象（用于获取年龄计算最大心率）
     
     Returns:
         心率区间分布字典，或 None
     """
-    next_date = report_date + timedelta(days=1)
+    # 时区转换
+    utc_start, utc_end = _utc_to_local_range(report_date)
+    
     data = db.query(BodyStatusTimeseries).filter(
         BodyStatusTimeseries.user_id == user_id,
-        BodyStatusTimeseries.timestamp >= report_date,
-        BodyStatusTimeseries.timestamp < next_date,
+        BodyStatusTimeseries.timestamp >= utc_start,
+        BodyStatusTimeseries.timestamp < utc_end,
         BodyStatusTimeseries.heart_rate.isnot(None)
     ).all()
     
@@ -578,16 +610,18 @@ def _get_energy_curve_analysis(db: Session, user_id: int, report_date: date) -> 
     Args:
         db: Database session
         user_id: User ID
-        report_date: 报告日期
+        report_date: 报告日期（本地时间）
     
     Returns:
         能量曲线分析字典，或 None
     """
-    next_date = report_date + timedelta(days=1)
+    # 时区转换
+    utc_start, utc_end = _utc_to_local_range(report_date)
+    
     data = db.query(BodyStatusTimeseries).filter(
         BodyStatusTimeseries.user_id == user_id,
-        BodyStatusTimeseries.timestamp >= report_date,
-        BodyStatusTimeseries.timestamp < next_date,
+        BodyStatusTimeseries.timestamp >= utc_start,
+        BodyStatusTimeseries.timestamp < utc_end,
         BodyStatusTimeseries.body_battery.isnot(None)
     ).order_by(BodyStatusTimeseries.timestamp).all()
     
@@ -600,7 +634,10 @@ def _get_energy_curve_analysis(db: Session, user_id: int, report_date: date) -> 
     hour_data = []
     
     for d in data:
-        hour = d.timestamp.hour
+        # 将 UTC 时间转换为本地时间
+        local_ts = d.timestamp + LOCAL_TZ_OFFSET
+        hour = local_ts.hour
+        
         if current_hour is None:
             current_hour = hour
             hour_data = [d]
@@ -622,7 +659,7 @@ def _get_energy_curve_analysis(db: Session, user_id: int, report_date: date) -> 
             segments.append(segment)
     
     # 找出最低点和快速消耗时段
-    bb_values = [(d.body_battery, d.timestamp) for d in data if d.body_battery is not None]
+    bb_values = [(d.body_battery, d.timestamp + LOCAL_TZ_OFFSET) for d in data if d.body_battery is not None]
     if not bb_values:
         return None
     
@@ -680,8 +717,12 @@ def _analyze_hour_segment(hour_data: list) -> dict | None:
     hr_values = [d.heart_rate for d in hour_data if d.heart_rate is not None]
     avg_hr = round(sum(hr_values) / len(hr_values)) if hr_values else None
     
+    # 转换为本地时间
+    local_first = first.timestamp + LOCAL_TZ_OFFSET
+    local_last = last.timestamp + LOCAL_TZ_OFFSET
+    
     return {
-        'time_range': f"{first.timestamp.strftime('%H:%M')}-{last.timestamp.strftime('%H:%M')}",
+        'time_range': f"{local_first.strftime('%H:%M')}-{local_last.strftime('%H:%M')}",
         'start_bb': start_bb,
         'end_bb': end_bb,
         'bb_change': bb_change,
