@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     scheduler_evening_hour: int = 21  # 21:00 (9 PM) for evening report
     scheduler_garmin_sync_days: int = 7  # Days to sync before generating report
 
+    # Smart Retry Configuration
+    data_freshness_threshold_hours: int = 2  # Data freshness threshold (hours)
+    retry_interval_minutes: int = 30  # Retry interval (minutes)
+    max_retry_count: int = 3  # Maximum retry attempts
+
     @property
     def database_path(self) -> str:
         """获取数据库连接字符串，优先使用 DATABASE_URL，否则使用 DATA_DIR"""

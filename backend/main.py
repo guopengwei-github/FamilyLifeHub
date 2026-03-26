@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.api.v1 import ingest, dashboard, users, auth, health, garmin, preferences, timeseries, reports, smtp_config, scheduler_logs, notifications, agent
+from app.api.v1 import ingest, dashboard, users, auth, health, garmin, preferences, timeseries, reports, smtp_config, scheduler_logs, agent
 
 # Run database migrations before creating tables
 from migrations.add_sleep_stage_columns import migrate as migrate_sleep_stages
@@ -60,7 +60,6 @@ app.include_router(timeseries.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(smtp_config.router, prefix="/api/v1")
 app.include_router(scheduler_logs.router, prefix="/api/v1")
-app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
 
 

@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models import User, HealthMetric, BodyStatusTimeseries, GarminActivity
-from app.core.timezone import local_date_to_utc_range
+from app.core.timezone import local_date_to_utc_range, utc_to_local
 
 
 def aggregate_morning_report_data(
@@ -615,7 +615,7 @@ def _get_energy_curve_analysis(db: Session, user_id: int, report_date: date) -> 
     
     for d in data:
         # 将 UTC 时间转换为本地时间
-        local_ts = d.timestamp + LOCAL_TZ_OFFSET
+        local_ts = utc_to_local(d.timestamp)
         hour = local_ts.hour
         
         if current_hour is None:
@@ -639,7 +639,7 @@ def _get_energy_curve_analysis(db: Session, user_id: int, report_date: date) -> 
             segments.append(segment)
     
     # 找出最低点和快速消耗时段
-    bb_values = [(d.body_battery, d.timestamp + LOCAL_TZ_OFFSET) for d in data if d.body_battery is not None]
+    bb_values = [(d.body_battery, utc_to_local(d.timestamp)) for d in data if d.body_battery is not None]
     if not bb_values:
         return None
     
@@ -698,8 +698,8 @@ def _analyze_hour_segment(hour_data: list) -> dict | None:
     avg_hr = round(sum(hr_values) / len(hr_values)) if hr_values else None
     
     # 转换为本地时间
-    local_first = first.timestamp + LOCAL_TZ_OFFSET
-    local_last = last.timestamp + LOCAL_TZ_OFFSET
+    local_first = utc_to_local(first.timestamp)
+    local_last = utc_to_local(last.timestamp)
     
     return {
         'time_range': f"{local_first.strftime('%H:%M')}-{local_last.strftime('%H:%M')}",
