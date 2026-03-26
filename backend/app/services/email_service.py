@@ -7,7 +7,7 @@ import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -221,3 +221,102 @@ class EmailService:
 </body>
 </html>
         """.strip()
+
+    @staticmethod
+    def send_data_expired_notification(
+        db: Session,
+        user: User,
+        last_update: datetime,
+        report_type: str,
+        retry_count: int,
+        max_retries: int = 3
+    ) -> Tuple[bool, str]:
+        """
+        发送数据过期提醒邮件给用户
+
+        Args:
+            db: Database session
+            user: User对象
+            last_update: 最后更新时间（本地时间）
+            report_type: 'morning' or 'evening'
+            retry_count: 当前重试次数（从1开始）
+            max_retries: 最大重试次数
+
+        Returns:
+            Tuple of (success: bool, message: str)
+        """
+        # Get SMTP config
+        smtp_config = db.query(SmtpConfig).filter(
+            SmtpConfig.user_id == user.id,
+            SmtpConfig.is_active == 1
+        ).first()
+        
+        if not smtp_config:
+            return False, f"User {user.id} has no active SMTP configuration"
+        
+        # Generate email content
+        report_type_cn = "晨间报告" if report_type == "morning" else "晚间报告"
+        subject = f"【数据过期提醒】请更新 Garmin 数据 - 第 {retry_count}/{max_retries} 次重试"
+        
+        # 格式化时间
+        last_update_local = last_update.strftime('%Y-%m-%d %H:%M:%S')
+        now_local = datetime.now(timezone.utc) + timedelta(hours=8)
+        
+        # 生成HTML邮件内容
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #f09300 0%, #f09b4b 100%); color: white; padding: 24px; border-radius: 8px 8px 0 0;">
+        <h1 style="margin: 0; font-size: 24px;">数据过期提醒</h1>
+    </div>
+    <div style="background: #fff9e6; padding: 24px; border: 1px solid #f3f4f7; border-top: none; border-radius: 0 0 8px 8px;">
+        <p style="color: #2d3748; margin-bottom: 16px;">
+            亲爱的 {user.name}：
+        </p>
+        
+        <p style="color: #4a5568; margin-bottom: 12px;">
+            检测到您的 Garmin 数据已超过 <strong>{DATA_FRESHNESS_THRESHOLD_HOURS}</strong> 小时未更新。
+        </p>
+        
+        <p style="color: #4a5568; margin-bottom: 16px;">
+            系统检测到数据过期，会在 <strong>{RETRY_INTERVAL_MINUTES}</strong> 分钟后自动重试（最多 {max_retries} 次）。
+        </p>
+        
+        <h3 style="color: #2d3748; margin-top: 24px;">最后更新时间</h3>
+        <p style="margin-left: 20px; margin-bottom: 16px;">
+            <strong>更新时间（北京时间）：</strong> {last_update_local}
+        </p>
+        
+        <h3 style="color: #2d3748; margin-top: 24px;">操作指引</h3>
+        <ul style="margin-left: 20px; color: #4a5568;">
+            <li style="margin-bottom: 8px;">打开 Garmin Connect App</li>
+            <li style="margin-bottom: 8px;">下拉同步数据（约 5-10 分钟）等待数据上传到服务端</li>
+            <li style="margin-bottom: 8px;">确保手机蓝牙已开启</li>
+            <li style="margin-bottom: 8px;">确保 Garmin Connect App 正常运行</li>
+        </ul>
+        
+        <h3 style="color: #2d3748; margin-top: 24px;">重试进度</h3>
+        <p style="margin-top: 20px; color: #718096; font-size: 12px; text-align: center;">
+            第 {retry_count}/{max_retries} 次重试
+        </p>
+        
+        <p style="text-align: center; margin-top: 20px; color: #718096; font-size: 12px;">
+            此邮件由 FamilyLifeHub 自动发送
+        </p>
+    </div>
+</body>
+</html>
+        """.strip()
+        
+        # 发送邮件
+        return EmailService.send_email(
+            smtp_config=smtp_config,
+            to_email=user.mail_for_notification,
+            subject=subject,
+            html_content=html_content
+        )
