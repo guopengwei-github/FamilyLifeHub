@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.core.config import settings
+from app.core.timezone import get_local_now, local_date_to_utc_range
 from app.models import User, HealthReport, GarminConnection, HealthMetric
 from app.models.scheduler import ReportRetryLog
 from app.services.llm.zhipu import ZhipuProvider
@@ -30,9 +31,6 @@ from app.services.email_service import EmailService
 logger = logging.getLogger(__name__)
 
 scheduler: Optional[AsyncIOScheduler] = None
-
-# 时区配置（Asia/Shanghai = UTC+8）
-LOCAL_TZ_OFFSET = timedelta(hours=8)
 
 # 从配置中读取重试参数
 DATA_FRESHNESS_THRESHOLD_HOURS = settings.data_freshness_threshold_hours
@@ -61,7 +59,7 @@ def check_data_freshness(db: Session, user_id: int, report_date: date) -> Tuple[
     Returns:
         Tuple of (is_fresh: bool, last_update_time: Optional[datetime])
         - is_fresh: True if data is less than 2 hours old
-        - last_update_time: Last update time in local timezone (UTC+8), or None
+        - last_update_time: Last update time in local timezone, or None
     """
     # 获取健康数据
     metric = db.query(HealthMetric).filter(
@@ -73,13 +71,11 @@ def check_data_freshness(db: Session, user_id: int, report_date: date) -> Tuple[
         logger.warning(f"No data or updated_at for user {user_id} on {report_date}")
         return False, None
     
-    # 转换为本地时间（UTC+8）
-    last_update_utc = metric.updated_at
-    if last_update_utc.tzinfo is None:
-        last_update_utc = last_update_utc.replace(tzinfo=timezone.utc)
+    # 使用统一的时区工具转换时间
+    from app.core.timezone import utc_to_local, get_local_now
     
-    last_update_local = last_update_utc + LOCAL_TZ_OFFSET
-    now_local = datetime.now(timezone.utc) + LOCAL_TZ_OFFSET
+    last_update_local = utc_to_local(metric.updated_at)
+    now_local = get_local_now()
     
     # 计算数据年龄
     age = now_local - last_update_local
