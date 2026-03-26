@@ -181,7 +181,10 @@ def _get_hrv_data(db: Session, user_id: int, report_date: date) -> dict | None:
 
 
 def _get_morning_body_battery(db: Session, user_id: int, report_date: date) -> dict | None:
-    """Get morning body battery starting value with before/after sleep values."""
+    """Get morning body battery starting value with before/after sleep values.
+    
+    早报应该显示睡眠后的满电状态（时间序列数据的最高值）
+    """
     metric = db.query(HealthMetric).filter(
         HealthMetric.user_id == user_id,
         HealthMetric.date == report_date
@@ -192,12 +195,33 @@ def _get_morning_body_battery(db: Session, user_id: int, report_date: date) -> d
 
     result = {}
 
-    if metric.body_battery is not None:
-        result['morning_value'] = metric.body_battery
-        result['after_sleep'] = metric.body_battery
+    # 查询时间序列数据，获取睡眠后的满电状态（最高值）
+    utc_start, utc_end = local_date_to_utc_range(report_date)
+    
+    ts_data = db.query(BodyStatusTimeseries).filter(
+        BodyStatusTimeseries.user_id == user_id,
+        BodyStatusTimeseries.timestamp >= utc_start,
+        BodyStatusTimeseries.timestamp < utc_end,
+        BodyStatusTimeseries.body_battery.isnot(None)
+    ).order_by(BodyStatusTimeseries.timestamp).all()
+    
+    if ts_data:
+        # 找出最高值（睡眠后的满电状态）
+        max_bb = max(ts_data, key=lambda x: x.body_battery)
+        result['morning_value'] = max_bb.body_battery
+        result['after_sleep'] = max_bb.body_battery
+        
+        # 找出最低值（睡眠前的低电状态）
+        min_bb = min(ts_data, key=lambda x: x.body_battery)
+        result['before_sleep'] = min_bb.body_battery
+    else:
+        # 如果没有时间序列数据，使用 HealthMetric 中的值
+        if metric.body_battery is not None:
+            result['morning_value'] = metric.body_battery
+            result['after_sleep'] = metric.body_battery
 
-    if metric.body_battery_before_sleep is not None:
-        result['before_sleep'] = metric.body_battery_before_sleep
+        if metric.body_battery_before_sleep is not None:
+            result['before_sleep'] = metric.body_battery_before_sleep
 
     # 计算睡眠充电量
     if 'before_sleep' in result and 'after_sleep' in result:
